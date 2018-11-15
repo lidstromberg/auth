@@ -6,6 +6,7 @@ import (
 
 	aucm "github.com/lidstromberg/auth/authcommon"
 	lbcf "github.com/lidstromberg/config"
+	stor "github.com/lidstromberg/storage"
 
 	"golang.org/x/net/context"
 )
@@ -28,7 +29,7 @@ func preflight(ctx context.Context, bc lbcf.ConfigSetting) {
 	sm, err := stor.NewStorMgr(ctx, bc)
 
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 
 	//load the mailer config

@@ -12,6 +12,7 @@ import (
 	lbcf "github.com/lidstromberg/config"
 	kp "github.com/lidstromberg/keypair"
 	sess "github.com/lidstromberg/session"
+	stor "github.com/lidstromberg/storage"
 
 	sendgrid "github.com/sendgrid/sendgrid-go"
 	"golang.org/x/net/context"
@@ -27,8 +28,15 @@ func createNewCore(ctx context.Context) (AuthCore, error) {
 	cfm1 := aucm.PreflightConfigLoader()
 	bc.LoadConfigMap(ctx, cfm1)
 
+	//create a storage manager
+	sm, err := stor.NewStorMgr(ctx, bc)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	//load the mailer config
-	cfm2, err := aucm.LoadMailerConfig(ctx, bc.GetConfigValue(ctx, "EnvAuthKPType"), bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
+	cfm2, err := aucm.LoadMailerConfig(ctx, sm, bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
 
 	if err != nil {
 		log.Fatal(err)

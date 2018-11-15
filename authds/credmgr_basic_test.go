@@ -1,10 +1,12 @@
 package authds
 
 import (
+	"log"
 	"testing"
 
 	aucm "github.com/lidstromberg/auth/authcommon"
 	lbcf "github.com/lidstromberg/config"
+	stor "github.com/lidstromberg/storage"
 
 	context "golang.org/x/net/context"
 )
@@ -18,8 +20,18 @@ func Test_DataRepoConnect(t *testing.T) {
 	cfm1 := aucm.PreflightConfigLoader()
 	bc.LoadConfigMap(ctx, cfm1)
 
-	cfm2, err := aucm.LoadMailerConfig(ctx, bc.GetConfigValue(ctx, "EnvMailerType"), bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
+	//create a storage manager
+	sm, err := stor.NewStorMgr(ctx, bc)
+
 	if err != nil {
+		log.Fatal(err)
+	}
+
+	//load the mailer config
+	cfm2, err := aucm.LoadMailerConfig(ctx, sm, bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
+
+	if err != nil {
+		t.Log(err)
 		t.Fatal("Could not load from environment variable EnvMailerFile")
 	}
 
@@ -49,13 +61,6 @@ func Test_SetSystemDefault(t *testing.T) {
 	cfm1 := aucm.PreflightConfigLoader()
 	bc.LoadConfigMap(ctx, cfm1)
 
-	cfm2, err := aucm.LoadMailerConfig(ctx, bc.GetConfigValue(ctx, "EnvAuthKPType"), bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
-	if err != nil {
-		t.Fatal("Could not load from environment variable EnvMailerFile")
-	}
-
-	bc.LoadConfigMap(ctx, cfm2)
-
 	cm, err := NewDsCredentialMgr(ctx, bc)
 
 	if err != nil {
@@ -76,13 +81,6 @@ func Test_GetSystemDefault(t *testing.T) {
 	//run preflight checks
 	cfm1 := aucm.PreflightConfigLoader()
 	bc.LoadConfigMap(ctx, cfm1)
-
-	cfm2, err := aucm.LoadMailerConfig(ctx, bc.GetConfigValue(ctx, "EnvAuthKPType"), bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
-	if err != nil {
-		t.Fatal("Could not load from environment variable EnvMailerFile")
-	}
-
-	bc.LoadConfigMap(ctx, cfm2)
 
 	cm, err := NewDsCredentialMgr(ctx, bc)
 
