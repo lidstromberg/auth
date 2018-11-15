@@ -10,7 +10,7 @@ import (
 )
 
 //LoadMailerConfig loads the mailer config file
-func LoadMailerConfig(ctx context.Context, storagetype, bucketName, fileName string) (map[string]string, error) {
+func LoadMailerConfig(ctx context.Context, sm *stor.StorMgr, bucketName, fileName string) (map[string]string, error) {
 	cfm := make(map[string]string)
 
 	type mailerData struct {
@@ -29,38 +29,16 @@ func LoadMailerConfig(ctx context.Context, storagetype, bucketName, fileName str
 	var md mailerData
 
 	//GCS read (otherwise local read)
-	if storagetype == "bucket" {
-		sm, err := stor.NewMgr(ctx)
+	filebytes, err := sm.GetBucketFileData(ctx, bucketName, fileName)
 
-		if err != nil {
-			return nil, err
-		}
+	if err != nil {
+		return nil, err
+	}
 
-		filebytes, err := sm.GetBucketFileData(ctx, bucketName, fileName)
+	err = json.Unmarshal(filebytes, &md)
 
-		if err != nil {
-			return nil, err
-		}
-
-		err = json.Unmarshal(filebytes, &md)
-
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		file, err := os.Open(fileName)
-
-		if err != nil {
-			return nil, err
-		}
-
-		deco := json.NewDecoder(file)
-
-		err = deco.Decode(&md)
-
-		if err != nil {
-			return nil, err
-		}
+	if err != nil {
+		return nil, err
 	}
 
 	cfm["EnvAuthMailSenderAccount"] = md.MlSender
