@@ -1,0 +1,40 @@
+################################
+# GCP DETAILS
+################################
+export LBAUTH_GCP_PROJECT="{{PROJECTNAME}}"
+export LBAUTH_GCP_BUCKET="{{BUCKETNAME}}"
+
+
+################################
+# GCP/SENDGRID CREDENTIALS
+################################
+export GOOGLE_APPLICATION_CREDENTIALS="/PATH/TO/GCPCREDENTIALS.JSON"
+export SENDGRID_API_KEY="{{SENDGRID_API_KEY}}"
+
+
+################################
+# AUTH GLOBAL
+################################
+export LBAUTH_APPROLEDELIM=":"
+export LBAUTH_DSTYPE="datastore"
+export LBAUTH_RNTYPE="service"
+export LBAUTH_MAILERFILE="/PATH/TO/mailerdata.json"
+export LB_DEBUGON="true"
+
+
+################################
+# AUTH SQL
+# See https://cloud.google.com/sql/docs/postgres/sql-proxy
+################################
+export LBAUTH_SQLDST="cloudsqlpostgres"
+export LBAUTH_SQLCNX="host=127.0.0.1:5432 dbname={{DBNAME}} user={{USER}} password={{PASSWORD}} sslmode=disable"
+
+
+################################
+# AUTH DS
+################################
+export LBAUTH_ACCNAMESP="auth"
+export LBAUTH_KD_ACCCNF="useraccountconfirmation"
+export LBAUTH_KD_ACC="useraccount"
+export LBAUTH_KD_SYSDEF="systemdefault"
+export LBAUTH_CLIPOOL="5"

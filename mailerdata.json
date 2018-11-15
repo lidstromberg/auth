@@ -1,0 +1,13 @@
+{
+    "mlsender":"admin@mydomain.com",
+    "mlsendername":"My Domain",
+    "mlconfirm":"http://localhost:8080/auth/api/v1/global/confirmer/%s",
+    "mlconfirmredirect":"https://mydomain.com/myredirecturl/%s",
+    "mlregsubject":"Welcome to %s! Please confirm your registration",
+    "mlregtxt":"Please confirm your registration by putting this URL into a web browser: %s%s",
+    "mlreghtml":"<a href='%s%s'>Please click here to confirm your registration.</a>",
+    "mlcredsubject":"Password reset requested",
+    "mlcredtxt":"To reset your password, please type this URL into a web browser: %s%s",
+    "mlcredhtml":"<a href='%s%s'>Please click here to reset your password.</a>"
+}
+
