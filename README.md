@@ -134,7 +134,7 @@ export LBAUTH_CLIPOOL="5"
 ```
 
 #### Private/Public Certs for JWT
-You will also require RSA certs for the [jwt-go] JWT tokens. The following will generate them (assuming you have openssl installed). You should place a password on the private key when prompted.
+If you want to run the authcore tests or the example implmentations, then you will also require RSA certs for the [jwt-go] tokens. The following will generate them (assuming you have openssl installed). You should place a password on the private key when prompted.
 
 ```sh
 $ ssh-keygen -t rsa -b 4096 -f jwt.key
@@ -145,7 +145,7 @@ $ openssl rsa -in jwt.key -pubout -outform PEM -pubout -out jwt.key.pub
 If you intend to use GCP datastore as your backend, then you will require:
 * A GCP project
 * A GCP storage bucket (private) to store the jwt private/public keys and the mailerdata.json file (in the root of the bucket)
-* GCP Datastore enabled (which means your GCP Project's AppEngine must be enabled)
+* GCP Datastore enabled (which currently means your GCP Project's AppEngine must be enabled)
 * Your GOOGLE_APPLICATION_CREDENTIALS json credentials key should be created with the following IAM scopes: 'Cloud SQL Client' (If you want to the use Cloud SQL Postgres); 'Cloud Datastore User'; 'Storage Object Viewer' and 'Storage Object Creator', or 'Storage Object Admin'.
 
 
