@@ -134,7 +134,7 @@ export LBAUTH_CLIPOOL="5"
 ```
 
 #### Private/Public Certs for JWT
-If you want to run the authcore tests or the example implmentations, then you will also require RSA certs for the [jwt-go] tokens. The following will generate them (assuming you have openssl installed). You should place a password on the private key when prompted.
+If you want to run the authcore tests or the example implementations, then you will also require RSA certs for the [jwt-go] tokens. The following will generate them (assuming you have openssl installed). You should place a password on the private key when prompted.
 
 ```sh
 $ ssh-keygen -t rsa -b 4096 -f jwt.key
