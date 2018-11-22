@@ -18,7 +18,6 @@ import (
 
 	"fmt"
 
-	"github.com/segmentio/ksuid"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"golang.org/x/net/context"
@@ -31,7 +30,7 @@ type AuthCore interface {
 	Register(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) (map[string]interface{}, error)
 	LoginCheck(ctx context.Context, emailAddress string) *aucm.UserAccountLoginCheck
 	Login(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) (map[string]interface{}, error)
-	GetLoginProfile(ctx context.Context, userID string) (*aucm.UserAccount, error)
+	GetLoginProfile(ctx context.Context, userID string, withSecure bool) (*aucm.UserAccount, error)
 	ToggleTwoFactor(ctx context.Context, domain, userID string, period int32, toggle, qr bool) *aucm.UserAccountOtpCheck
 	SaveAccount(ctx context.Context, userAccount *aucm.UserAccount) (string, error)
 	SavePassword(ctx context.Context, userID, newpwd string) (bool, error)
@@ -254,13 +253,8 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAcc
 		return nil, err
 	}
 
-	//create the base session header detail
-	shdr := make(map[string]interface{})
-
-	shdr["jti"] = ksuid.New().String()
-	shdr["rle"] = roletoken
-	shdr["aid"] = useracc.UserAccountID
-	shdr["eml"] = useracc.Email
+	//create the base session header
+	shdr := sess.MakeSessionMap(useracc.UserAccountID, useracc.Email, roletoken)
 
 	if EnvDebugOn {
 		// lblog.LogEvent("Core", "Register", "info", shdr.SessionID)
@@ -395,7 +389,7 @@ func (cr *Core) Login(ctx context.Context, userAccountCandidate *aucm.UserAccoun
 }
 
 //GetLoginProfile returns the user account profile
-func (cr *Core) GetLoginProfile(ctx context.Context, userID string) (*aucm.UserAccount, error) {
+func (cr *Core) GetLoginProfile(ctx context.Context, userID string, withSecure bool) (*aucm.UserAccount, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "GetLoginProfile", "info", "start")
 	}
@@ -404,6 +398,11 @@ func (cr *Core) GetLoginProfile(ctx context.Context, userID string) (*aucm.UserA
 
 	if err != nil {
 		return nil, err
+	}
+
+	if withSecure {
+		useracc.PasswordHash = ""
+		useracc.TwoFactorHash = ""
 	}
 
 	if EnvDebugOn {
@@ -503,6 +502,20 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 func (cr *Core) SaveAccount(ctx context.Context, userAccount *aucm.UserAccount) (string, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "SaveAccount", "info", "start")
+	}
+
+	//if this is a secured version of the user account, then restore the secured elements
+	if userAccount.PasswordHash == "" {
+		acc, err := cr.GetLoginProfile(ctx, userAccount.UserAccountID, false)
+		if err != nil {
+			return "", err
+		}
+
+		userAccount.PasswordHash = acc.PasswordHash
+
+		if userAccount.TwoFactorHash == "" {
+			userAccount.TwoFactorHash = acc.TwoFactorHash
+		}
 	}
 
 	result, err := cr.Dm.SaveAccount(ctx, userAccount)

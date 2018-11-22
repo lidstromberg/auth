@@ -26,7 +26,7 @@ func Test_SaveTwoFactor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	prof1, err := svb.GetLoginProfile(ctx, shdr[sess.ConstJwtAccID].(string))
+	prof1, err := svb.GetLoginProfile(ctx, shdr[sess.ConstJwtAccID].(string), true)
 
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func Test_SaveTwoFactor(t *testing.T) {
 
 	ioutil.WriteFile("qr-code.png", data, 0644)
 
-	prof1, err = svb.GetLoginProfile(ctx, shdr[sess.ConstJwtAccID].(string))
+	prof1, err = svb.GetLoginProfile(ctx, shdr[sess.ConstJwtAccID].(string), true)
 
 	if err != nil {
 		t.Fatal(err)

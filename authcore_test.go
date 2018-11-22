@@ -137,7 +137,7 @@ func Test_GetLoginProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	prof1, err := svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string))
+	prof1, err := svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string), true)
 
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +165,7 @@ func Test_SaveAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	prof1, err := svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string))
+	prof1, err := svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string), false)
 
 	if err != nil {
 		t.Fatal(err)
@@ -189,7 +189,7 @@ func Test_SaveAccount(t *testing.T) {
 
 	t.Logf("returned userid is %s", userid)
 
-	prof1, err = svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string))
+	prof1, err = svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string), true)
 
 	if err != nil {
 		t.Fatal(err)
@@ -523,7 +523,7 @@ func Test_SaveAccountApp(t *testing.T) {
 		t.Logf("sessid was returned %s", shdr[sess.ConstJwtID].(string))
 	}
 
-	uacc, err := svb.GetLoginProfile(ctx, shdr[sess.ConstJwtAccID].(string))
+	uacc, err := svb.GetLoginProfile(ctx, shdr[sess.ConstJwtAccID].(string), false)
 
 	if err != nil {
 		t.Fatal(err)
