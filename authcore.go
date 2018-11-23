@@ -2,6 +2,7 @@ package auth
 
 import (
 	"bytes"
+	"encoding/base64"
 	"strconv"
 	"time"
 
@@ -465,7 +466,7 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 		}
 
 		//base64 the QR bytes
-		qrc := cr.Kp.EncodeB64(ctx, rslt.Img)
+		qrc := base64.StdEncoding.EncodeToString(rslt.Img)
 
 		//update the user account record
 		uacc.TwoFactorEnabled = true
