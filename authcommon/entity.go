@@ -5,7 +5,7 @@ import (
 )
 
 //UserAccountCredential represents the fragment of the user account record which is used
-//to verify a password match
+//to verify a login attempt
 type UserAccountCredential struct {
 	UserAccountID     string     `json:"useraccountid" datastore:"useraccountid"`
 	PasswordHash      string     `json:"passwordhash" datastore:"passwordhash"`
@@ -16,11 +16,60 @@ type UserAccountCredential struct {
 	LockoutEnd        *time.Time `json:"lockoutend,omitempty" datastore:"lockoutend"`
 }
 
+//LoginTrx is a short-lived record of a login attempt
+type LoginTrx struct {
+	UserAccountID string     `json:"useraccountid" datastore:"useraccountid"`
+	Email         string     `json:"email" datastore:"email"`
+	RoleToken     string     `json:"roletoken" datastore:"roletoken"`
+	TwoFactorHash string     `json:"twofactorhash" datastore:"twofactorhash"`
+	CreatedDate   *time.Time `json:"createddate,omitempty" datastore:"createddate"`
+}
+
+//EmailCandidate represents the user supplied text email
+type EmailCandidate struct {
+	Email string `json:"email"`
+}
+
 //UserAccountCandidate represents the user supplied text email and password
 type UserAccountCandidate struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
-	Otp      string `json:"otp"`
+}
+
+//OtpCandidate represents the user supplied text email and otp
+type OtpCandidate struct {
+	Email string `json:"email"`
+	Otp   string `json:"otp"`
+}
+
+//CheckResult represents information regarding a data search/save outcome
+type CheckResult struct {
+	CheckResult  bool   `json:"checkresult"`
+	CheckMessage string `json:"checkmessage"`
+	Error        error  `json:"-"`
+}
+
+//LoginCheckResult returns the state of the account
+type LoginCheckResult struct {
+	Check    *CheckResult `json:"check"`
+	IsLocked bool         `json:"islocked"`
+}
+
+//PasswordCheckResult represents a set of return values from a password check
+type PasswordCheckResult struct {
+	Check       *CheckResult `json:"check"`
+	IsTwoFactor bool         `json:"istwofactor"`
+}
+
+//LoginOtpResult returns the otp result
+type LoginOtpResult struct {
+	Check *CheckResult `json:"check"`
+}
+
+//ToggleOtpResult represents the return values from a 2FA toggle attempt
+type ToggleOtpResult struct {
+	Check *CheckResult `json:"check"`
+	Qr    string       `json:"qr"`
 }
 
 //UserAccountPasswordChange represents the fragment of the user account record which is required
@@ -34,34 +83,6 @@ type UserAccountPasswordChange struct {
 type SystemDefault struct {
 	ItemKey   string `json:"itemkey" datastore:"itemkey"`
 	ItemValue string `json:"itemvalue" datastore:"itemvalue"`
-}
-
-//CheckResult represents information regarding a data search/save outcome
-type CheckResult struct {
-	CheckResult  bool   `json:"checkresult"`
-	CheckMessage string `json:"checkmessage"`
-	Error        error  `json:"-"`
-}
-
-//UserAccountPasswordCheck represents an arbitrary set of return values from a password check
-//a true result may have a useraccountid, a false result may have a checkmessage and error
-type UserAccountPasswordCheck struct {
-	Check         *CheckResult `json:"check"`
-	UserAccountID string       `json:"useraccountid"`
-}
-
-//UserAccountLoginCheck represents a set of return values which indicate
-//what options the user has for logging in
-type UserAccountLoginCheck struct {
-	Check       *CheckResult `json:"check"`
-	IsTwoFactor bool         `json:"istwofactor"`
-	IsLocked    bool         `json:"islocked"`
-}
-
-//UserAccountOtpCheck represents the return values from a 2FA toggle attempt
-type UserAccountOtpCheck struct {
-	Check *CheckResult `json:"check"`
-	Qr    string       `json:"qr"`
 }
 
 //SystemDefaultCheck represents the return values from a system default retrieval attempt
