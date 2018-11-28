@@ -61,6 +61,12 @@ type PasswordCheckResult struct {
 	IsTwoFactor bool         `json:"istwofactor"`
 }
 
+//RegisterCheckResult represents a set of return values from a register attempt
+type RegisterCheckResult struct {
+	Check        *CheckResult `json:"check"`
+	ConfirmToken string       `json:"confirmtoken"`
+}
+
 //LoginOtpResult returns the otp result
 type LoginOtpResult struct {
 	Check *CheckResult `json:"check"`
