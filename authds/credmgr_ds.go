@@ -8,6 +8,7 @@ import (
 	aucm "github.com/lidstromberg/auth/authcommon"
 	lbcf "github.com/lidstromberg/config"
 	lblog "github.com/lidstromberg/log"
+	utils "github.com/lidstromberg/utils"
 
 	"cloud.google.com/go/datastore"
 	"golang.org/x/net/context"
@@ -371,7 +372,7 @@ func (credentialMgr *DsCredentialMgr) StartAccountConfirmation(ctx context.Conte
 	currentTime := time.Now()
 	expiryTime := currentTime.Add(time.Hour * 24)
 
-	acctokenKey, err := credentialMgr.newKey(ctx, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountConfirmKind"))
+	acctokenKey, err := utils.NewDsKey(ctx, credentialMgr.CmDsClient, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountConfirmKind"))
 
 	if err != nil {
 		return nil, err
@@ -560,31 +561,9 @@ func (credentialMgr *DsCredentialMgr) SaveSystemDefault(ctx context.Context, sys
 	return nil
 }
 
-//newKey is datastore specific and returns a key using datastore.AllocateIDs
-func (credentialMgr *DsCredentialMgr) newKey(ctx context.Context, dsNS, dsKind string) (*datastore.Key, error) {
-	var keys []*datastore.Key
-
-	//create an incomplete key of the type and namespace
-	newKey := datastore.IncompleteKey(dsKind, nil)
-	newKey.Namespace = dsNS
-
-	//append it to the slice
-	keys = append(keys, newKey)
-
-	//allocate the ID from datastore
-	keys, err := credentialMgr.CmDsClient.AllocateIDs(ctx, keys)
-
-	if err != nil {
-		return nil, err
-	}
-
-	//return only the first key
-	return keys[0], nil
-}
-
 //NewAccountID returns a new id key for the account entity
 func (credentialMgr *DsCredentialMgr) NewAccountID(ctx context.Context) (string, error) {
-	key, err := credentialMgr.newKey(ctx, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountKind"))
+	key, err := utils.NewDsKey(ctx, credentialMgr.CmDsClient, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountKind"))
 
 	if err != nil {
 		return "", err
@@ -595,7 +574,7 @@ func (credentialMgr *DsCredentialMgr) NewAccountID(ctx context.Context) (string,
 
 //NewConfirmID returns a new id key for the confirmation entity
 func (credentialMgr *DsCredentialMgr) NewConfirmID(ctx context.Context) (string, error) {
-	key, err := credentialMgr.newKey(ctx, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountConfirmKind"))
+	key, err := utils.NewDsKey(ctx, credentialMgr.CmDsClient, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountConfirmKind"))
 
 	if err != nil {
 		return "", err

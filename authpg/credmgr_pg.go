@@ -10,9 +10,9 @@ import (
 	"encoding/json"
 
 	aucm "github.com/lidstromberg/auth/authcommon"
-	utils "github.com/lidstromberg/auth/utils"
 	lbcf "github.com/lidstromberg/config"
 	lblog "github.com/lidstromberg/log"
+	utils "github.com/lidstromberg/utils"
 
 	//github.com/lib/pq this is required as a blank import for database interactions
 	//_ "github.com/lib/pq"

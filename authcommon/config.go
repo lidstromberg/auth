@@ -44,7 +44,7 @@ func LoadMailerConfig(ctx context.Context, sm *stor.StorMgr, bucketName, fileNam
 	cfm["EnvAuthMailSenderAccount"] = md.MlSender
 	cfm["EnvAuthMailSenderName"] = md.MlSenderName
 	cfm["EnvAuthMailAccountConfirmationURL"] = md.MlConfirm
-	cfm["EnvAuthAccountConfirmationRedirectURL"] = md.MlConfirmRedirect
+	cfm["EnvAuthMailAccountConfirmationRdURL"] = md.MlConfirmRedirect
 	cfm["EnvAuthMailAccountRegSubject"] = md.MlRegSubject
 	cfm["EnvAuthMailAccountRegPlainTxt"] = md.MlRegTxt
 	cfm["EnvAuthMailAccountRegHTML"] = md.MlRegHTML

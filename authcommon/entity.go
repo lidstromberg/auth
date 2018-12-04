@@ -16,15 +16,6 @@ type UserAccountCredential struct {
 	LockoutEnd        *time.Time `json:"lockoutend,omitempty" datastore:"lockoutend"`
 }
 
-//LoginTrx is a short-lived record of a login attempt
-type LoginTrx struct {
-	UserAccountID string     `json:"useraccountid" datastore:"useraccountid"`
-	Email         string     `json:"email" datastore:"email"`
-	RoleToken     string     `json:"roletoken" datastore:"roletoken"`
-	TwoFactorHash string     `json:"twofactorhash" datastore:"twofactorhash"`
-	CreatedDate   *time.Time `json:"createddate,omitempty" datastore:"createddate"`
-}
-
 //EmailCandidate represents the user supplied text email
 type EmailCandidate struct {
 	Email string `json:"email"`
