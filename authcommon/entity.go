@@ -42,14 +42,16 @@ type CheckResult struct {
 
 //LoginCheckResult returns the state of the account
 type LoginCheckResult struct {
-	Check    *CheckResult `json:"check"`
-	IsLocked bool         `json:"islocked"`
+	Check       *CheckResult           `json:"check"`
+	IsTwoFactor bool                   `json:"istwofactor"`
+	Header      map[string]interface{} `json:"header"`
 }
 
 //PasswordCheckResult represents a set of return values from a password check
 type PasswordCheckResult struct {
-	Check       *CheckResult `json:"check"`
-	IsTwoFactor bool         `json:"istwofactor"`
+	Check         *CheckResult `json:"check"`
+	UserAccountID string       `json:"useraccountid"`
+	IsTwoFactor   bool         `json:"istwofactor"`
 }
 
 //RegisterCheckResult represents a set of return values from a register attempt
