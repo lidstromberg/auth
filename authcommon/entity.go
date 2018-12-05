@@ -16,11 +16,6 @@ type UserAccountCredential struct {
 	LockoutEnd        *time.Time `json:"lockoutend,omitempty" datastore:"lockoutend"`
 }
 
-//EmailCandidate represents the user supplied text email
-type EmailCandidate struct {
-	Email string `json:"email"`
-}
-
 //UserAccountCandidate represents the user supplied text email and password
 type UserAccountCandidate struct {
 	Email    string `json:"email"`
@@ -29,8 +24,8 @@ type UserAccountCandidate struct {
 
 //OtpCandidate represents the user supplied text email and otp
 type OtpCandidate struct {
-	Email string `json:"email"`
-	Otp   string `json:"otp"`
+	LoginID string `json:"loginid"`
+	Otp     string `json:"otp"`
 }
 
 //CheckResult represents information regarding a data search/save outcome
@@ -42,9 +37,9 @@ type CheckResult struct {
 
 //LoginCheckResult returns the state of the account
 type LoginCheckResult struct {
-	Check       *CheckResult           `json:"check"`
-	IsTwoFactor bool                   `json:"istwofactor"`
-	Header      map[string]interface{} `json:"header"`
+	Check       *CheckResult `json:"check"`
+	IsTwoFactor bool         `json:"istwofactor"`
+	LoginID     string       `json:"loginid"`
 }
 
 //PasswordCheckResult represents a set of return values from a password check
@@ -60,8 +55,8 @@ type RegisterCheckResult struct {
 	ConfirmToken string       `json:"confirmtoken"`
 }
 
-//LoginOtpResult returns the otp result
-type LoginOtpResult struct {
+//OtpResult returns the otp result
+type OtpResult struct {
 	Check *CheckResult `json:"check"`
 }
 
@@ -71,23 +66,22 @@ type ToggleOtpResult struct {
 	Qr    string       `json:"qr"`
 }
 
+//LoginCandidate is a record of a login attempt
+type LoginCandidate struct {
+	LoginID       string     `json:"loginid" datastore:"loginid"`
+	UserAccountID string     `json:"useraccountid" datastore:"useraccountid"`
+	Email         string     `json:"email" datastore:"email"`
+	RoleToken     string     `json:"roletoken" datastore:"roletoken"`
+	Activated     bool       `json:"activated" datastore:"activated"`
+	CreatedDate   *time.Time `json:"createddate,omitempty" datastore:"createddate"`
+	ActivatedDate *time.Time `json:"activateddate,omitempty" datastore:"activateddate"`
+}
+
 //UserAccountPasswordChange represents the fragment of the user account record which is required
 //to implement a password change (should we be using sessionid here instead?)
 type UserAccountPasswordChange struct {
 	UserAccountID string `json:"useraccountid"`
 	Password      string `json:"password"`
-}
-
-//SystemDefault represents a setting for the auth service
-type SystemDefault struct {
-	ItemKey   string `json:"itemkey" datastore:"itemkey"`
-	ItemValue string `json:"itemvalue" datastore:"itemvalue"`
-}
-
-//SystemDefaultCheck represents the return values from a system default retrieval attempt
-type SystemDefaultCheck struct {
-	Check *CheckResult   `json:"check"`
-	Sd    *SystemDefault `json:"sd"`
 }
 
 //UserAccount represents the full user account

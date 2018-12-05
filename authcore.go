@@ -8,10 +8,9 @@ import (
 
 	aucm "github.com/lidstromberg/auth/authcommon"
 	authds "github.com/lidstromberg/auth/authds"
-	authpg "github.com/lidstromberg/auth/authpg"
 	otp "github.com/lidstromberg/auth/otp"
-	utils "github.com/lidstromberg/auth/utils"
 	lbcf "github.com/lidstromberg/config"
+	utils "github.com/lidstromberg/utils"
 
 	kp "github.com/lidstromberg/keypair"
 	lblog "github.com/lidstromberg/log"
@@ -24,27 +23,41 @@ import (
 	"golang.org/x/net/context"
 )
 
-//AuthCore defines the full set of operations performed by the authentication service
-type AuthCore interface {
-	CreateAccountFromCandidate(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) (*aucm.UserAccount, error)
-	AccountExists(ctx context.Context, emailAddress string) (bool, error)
-	Register(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) (map[string]interface{}, error)
-	LoginCheck(ctx context.Context, emailAddress string) *aucm.UserAccountLoginCheck
-	Login(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) (map[string]interface{}, error)
-	GetLoginProfile(ctx context.Context, userID string, withSecure bool) (*aucm.UserAccount, error)
-	ToggleTwoFactor(ctx context.Context, domain, userID string, period int32, toggle, qr bool) *aucm.UserAccountOtpCheck
-	SaveAccount(ctx context.Context, userAccount *aucm.UserAccount) (string, error)
-	SavePassword(ctx context.Context, userID, newpwd string) (bool, error)
-	RequestReset(ctx context.Context, emailAddress, appName string, liveCall bool) (string, error)
-	FinishReset(ctx context.Context, userAccountToken, newpwd string) (*aucm.UserAccountConfirmationResult, error)
+//MailerAction defines actions which are called as part of an email based workflow
+type MailerAction interface {
 	StartAccountConfirmation(ctx context.Context, userID, email, appName string, liveCall bool) (string, error)
 	FinishAccountConfirmation(ctx context.Context, userAccountToken string) (*aucm.UserAccountConfirmationResult, error)
+	SaveEmailConfirmation(ctx context.Context, userAccountConf *aucm.UserAccountConfirmation) (*aucm.UserAccountConfirmationResult, error)
+	SendMail(ctx context.Context, emailConfirm *aucm.UserEmailConfirm, appName string, liveCall bool) (bool, error)
+}
+
+//AuthenticatedAction defines actions which require a user to be previously authenticated
+type AuthenticatedAction interface {
+	GetLoginProfile(ctx context.Context, userID string, withSecure bool) (*aucm.UserAccount, error)
+	ToggleTwoFactor(ctx context.Context, domain, userID string, period int32, toggle, qr bool) *aucm.ToggleOtpResult
+	SaveAccount(ctx context.Context, userAccount *aucm.UserAccount) (string, error)
+	SavePassword(ctx context.Context, userID, newpwd string) (bool, error)
 	HasAccess(ctx context.Context, emailAddress, appName string) (bool, error)
 	GetAccountRoleToken(ctx context.Context, userID string) (string, error)
 	GetAccountRole(ctx context.Context, userID string) ([]*aucm.UserAccountApplication, error)
-	VerifyCredential(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) *aucm.UserAccountPasswordCheck
-	SaveEmailConfirmation(ctx context.Context, userAccountConf *aucm.UserAccountConfirmation) (*aucm.UserAccountConfirmationResult, error)
-	SendMail(ctx context.Context, emailConfirm *aucm.UserEmailConfirm, appName string, liveCall bool) (bool, error)
+}
+
+//IdentityAction defines actions which are performed in order to identify/authenticate a user
+type IdentityAction interface {
+	Register(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) *aucm.RegisterCheckResult
+	Login(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) *aucm.LoginCheckResult
+	RequestReset(ctx context.Context, emailAddress, appName string) (string, error)
+	FinishReset(ctx context.Context, userAccountToken, newpwd string) (*aucm.UserAccountConfirmationResult, error)
+	AccountExists(ctx context.Context, emailAddress string) (bool, error)
+	VerifyCredential(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) *aucm.PasswordCheckResult
+}
+
+//AuthCore defines the full set of operations performed by the authentication service
+type AuthCore interface {
+	CreateAccountFromCandidate(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) (*aucm.UserAccount, error)
+	MailerAction
+	AuthenticatedAction
+	IdentityAction
 }
 
 //Core manages the issue log app operations
@@ -57,15 +70,13 @@ type Core struct {
 
 //NewCoreCredentialMgr creates a new credential base manager
 func NewCoreCredentialMgr(ctx context.Context, bc lbcf.ConfigSetting, kpr *kp.KeyPair, mc *sendgrid.Client) (AuthCore, error) {
-
 	preflight(ctx, bc)
 
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "NewCoreCredentialMgr", "info", "start")
 	}
 
-	dm, err := newDataMgr(ctx, bc)
-
+	dm, err := authds.NewDsCredentialMgr(ctx, bc)
 	if err != nil {
 		return nil, err
 	}
@@ -84,49 +95,6 @@ func NewCoreCredentialMgr(ctx context.Context, bc lbcf.ConfigSetting, kpr *kp.Ke
 	return ap1, nil
 }
 
-func newDataMgr(ctx context.Context, bc lbcf.ConfigSetting) (aucm.CredentialDataMgr, error) {
-	var dm aucm.CredentialDataMgr
-
-	switch bc.GetConfigValue(ctx, "EnvAuthDsType") {
-	case "postgres":
-		{
-			cm1, err := authpg.NewPgCredentialMgr(ctx, bc)
-
-			if err != nil {
-				return nil, err
-			}
-
-			dm = cm1
-		}
-	case "datastore":
-		{
-			cm1, err := authds.NewDsCredentialMgr(ctx, bc)
-
-			if err != nil {
-				return nil, err
-			}
-
-			dm = cm1
-		}
-	default:
-		{
-			cm1, err := authpg.NewPgCredentialMgr(ctx, bc)
-
-			if err != nil {
-				return nil, err
-			}
-
-			dm = cm1
-		}
-	}
-
-	if dm == nil {
-		return nil, aucm.ErrCredentialDataMgrInvalid
-	}
-
-	return dm, nil
-}
-
 //CreateAccountFromCandidate converts a candidate to a useraccount with hashed password
 func (cr *Core) CreateAccountFromCandidate(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) (*aucm.UserAccount, error) {
 	if EnvDebugOn {
@@ -141,7 +109,6 @@ func (cr *Core) CreateAccountFromCandidate(ctx context.Context, userAccountCandi
 	currentTime := time.Now()
 	zeroTime := time.Time{}
 	accID, err := cr.Dm.NewAccountID(ctx)
-
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +150,6 @@ func (cr *Core) AccountExists(ctx context.Context, emailAddress string) (bool, e
 	}
 
 	count, err := cr.Dm.GetAccountCount(ctx, emailAddress)
-
 	if err != nil {
 		return false, err
 	}
@@ -200,32 +166,44 @@ func (cr *Core) AccountExists(ctx context.Context, emailAddress string) (bool, e
 }
 
 //Register registers an account for the current application
-func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) (map[string]interface{}, error) {
+func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) *aucm.RegisterCheckResult {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "Register", "info", "start")
 	}
 
+	rcr := &aucm.RegisterCheckResult{Check: &aucm.CheckResult{}}
+
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(userAccountCandidate.Email) {
-		return nil, aucm.ErrEmailInvalid
+		rcr.Check.Error = aucm.ErrEmailInvalid
+		rcr.Check.CheckResult = false
+
+		return rcr
 	}
 
 	//check that the account does not already exist
 	accExist, err := cr.AccountExists(ctx, userAccountCandidate.Email)
-
 	if err != nil {
-		return nil, err
+		rcr.Check.Error = err
+		rcr.Check.CheckResult = false
+
+		return rcr
 	}
 
 	if accExist {
-		return nil, aucm.ErrAccountIsRegistered
+		rcr.Check.Error = aucm.ErrAccountIsRegistered
+		rcr.Check.CheckResult = false
+
+		return rcr
 	}
 
 	//then convert the candidate to a full account
 	useracc, err := cr.CreateAccountFromCandidate(ctx, userAccountCandidate)
-
 	if err != nil {
-		return nil, err
+		rcr.Check.Error = err
+		rcr.Check.CheckResult = false
+
+		return rcr
 	}
 
 	//then automap the account to the current application
@@ -240,153 +218,148 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAcc
 
 	useracc.Scopes = append(useracc.Scopes, uaccApp)
 
-	//save the account (returns true or error, so checking the error is enough)
-	_, err = cr.Dm.SaveAccount(ctx, useracc)
-
+	//save the account
+	userid, err := cr.Dm.SaveAccount(ctx, useracc)
 	if err != nil {
-		return nil, err
+		rcr.Check.Error = err
+		rcr.Check.CheckResult = false
+
+		return rcr
 	}
 
-	//get the authorisations token
-	roletoken, err := cr.GetAccountRoleToken(ctx, useracc.UserAccountID)
-
+	//start the mail confirmation
+	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid, userAccountCandidate.Email, aucm.Registration.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
 	if err != nil {
-		return nil, err
-	}
+		rcr.Check.Error = err
+		rcr.Check.CheckResult = false
 
-	//create the base session header
-	shdr := sess.MakeSessionMap(useracc.UserAccountID, useracc.Email, roletoken)
+		return rcr
+	}
 
 	if EnvDebugOn {
-		// lblog.LogEvent("Core", "Register", "info", shdr.SessionID)
-		// lblog.LogEvent("Core", "Register", "info", shdr.UserAccountID)
-		// lblog.LogEvent("Core", "Register", "info", shdr.RoleTokenID)
-		// lblog.LogEvent("Core", "Register", "info", shdr.Email)
-		lblog.LogEvent("Core", "Register", "info", "end")
+		lblog.LogEvent("Core", "Register", "info", emconf.ConfirmToken)
+		lblog.LogEvent("Core", "Register", "info", emconf.ConfirmURL)
+		lblog.LogEvent("Core", "Register", "info", emconf.Email)
+		lblog.LogEvent("Core", "Register", "info", emconf.EmailSender)
+		lblog.LogEvent("Core", "Register", "info", emconf.UserAccountConfirmationType)
 	}
 
-	return shdr, nil
-}
+	if emconf == nil {
+		rcr.Check.Error = aucm.ErrAccountRegNotCompleted
+		rcr.Check.CheckResult = false
 
-//LoginCheck checks for an account login options
-func (cr *Core) LoginCheck(ctx context.Context, emailAddress string) *aucm.UserAccountLoginCheck {
-	if EnvDebugOn {
-		lblog.LogEvent("Core", "AccountExists", "info", "start")
+		return rcr
 	}
 
-	chkr := &aucm.CheckResult{}
-	cmpreslt := &aucm.UserAccountLoginCheck{Check: chkr}
-
-	//reject if this is an invalid email
-	if !utils.EmailIsValid(emailAddress) {
-		cmpreslt.Check.CheckResult = false
-		cmpreslt.Check.Error = aucm.ErrEmailInvalid
-
-		return cmpreslt
-	}
-
-	//see if the account exists..
-	chk, err := cr.AccountExists(ctx, emailAddress)
-
+	result, err := cr.SendMail(ctx, emconf, appName, true)
 	if err != nil {
-		cmpreslt.Check.CheckResult = false
-		cmpreslt.Check.Error = err
+		rcr.Check.Error = err
+		rcr.Check.CheckResult = false
 
-		return cmpreslt
+		return rcr
 	}
 
-	//if the account doesn't exist then record this
-	if !chk {
-		cmpreslt.Check.CheckResult = false
-		cmpreslt.Check.Error = aucm.ErrAccountNotExist
+	if !result {
+		rcr.Check.Error = aucm.ErrMailConfirmNotCompleted
+		rcr.Check.CheckResult = false
 
-		return cmpreslt
-	}
-
-	//get the profile
-	uacc, err := cr.Dm.GetLoginProfileByEmail(ctx, emailAddress)
-
-	if err != nil {
-		cmpreslt.Check.CheckResult = false
-		cmpreslt.Check.Error = err
-
-		return cmpreslt
-	}
-
-	//if the account has 2FA enabled then record this
-	if uacc.TwoFactorEnabled {
-		cmpreslt.IsTwoFactor = true
-	} else {
-		cmpreslt.IsTwoFactor = false
-	}
-
-	//prep a current time
-	currentTime := time.Now()
-
-	//if the account is locked then record this
-	if uacc.LockoutEnd.After(currentTime) {
-		cmpreslt.IsLocked = true
-	} else {
-		cmpreslt.IsLocked = false
+		return rcr
 	}
 
 	//set the remaining values
-	cmpreslt.Check.CheckResult = true
-	cmpreslt.Check.CheckMessage = "success"
-	cmpreslt.Check.Error = nil
+	rcr.Check.CheckResult = true
+	rcr.Check.CheckMessage = "success"
+	rcr.Check.Error = nil
+	rcr.ConfirmToken = emconf.ConfirmToken
 
-	return cmpreslt
+	if EnvDebugOn {
+		lblog.LogEvent("Core", "Register", "info", "end")
+	}
+
+	return rcr
 }
 
 //Login logs in an existing user
-func (cr *Core) Login(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) (map[string]interface{}, error) {
+func (cr *Core) Login(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) *aucm.LoginCheckResult {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "Login", "info", "start")
 	}
 
+	//setup the return value
+	hdr := make(map[string]interface{})
+	lcr := &aucm.LoginCheckResult{Header: hdr}
+
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(userAccountCandidate.Email) {
-		return nil, aucm.ErrEmailInvalid
+		lcr.Check.Error = aucm.ErrEmailInvalid
+		lcr.Check.CheckResult = false
+
+		return lcr
 	}
 
 	//check the account exists
 	accExist, err := cr.AccountExists(ctx, userAccountCandidate.Email)
-
 	if err != nil {
-		return nil, err
+		lcr.Check.Error = err
+		lcr.Check.CheckResult = false
+
+		return lcr
 	}
 
 	if !accExist {
-		return nil, aucm.ErrAccountNotExist
+		lcr.Check.Error = aucm.ErrAccountNotExist
+		lcr.Check.CheckResult = false
+
+		return lcr
 	}
 
 	//check the user has access to this app (will always return error if access is denied
 	//so we ignore the boolean and check for the error
 	if _, err := cr.HasAccess(ctx, userAccountCandidate.Email, appName); err != nil {
-		return nil, err
+		lcr.Check.Error = err
+		lcr.Check.CheckResult = false
+
+		return lcr
 	}
 
 	//then check the credentials
 	pwdchk := cr.VerifyCredential(ctx, userAccountCandidate)
-
 	if !pwdchk.Check.CheckResult || pwdchk.Check.Error != nil {
-		return nil, pwdchk.Check.Error
+		lcr.Check.Error = pwdchk.Check.Error
+		lcr.Check.CheckResult = false
+
+		return lcr
 	}
 
 	//and get the authorisations token
 	roletoken, err := cr.GetAccountRoleToken(ctx, pwdchk.UserAccountID)
-
 	if err != nil {
-		return nil, err
+		lcr.Check.Error = err
+		lcr.Check.CheckResult = false
+
+		return lcr
 	}
 
-	//create the base session header
-	shdr := sess.MakeSessionMap(pwdchk.UserAccountID, userAccountCandidate.Email, roletoken)
+	//store the login candidate
+	lgid, err := cr.SaveLoginCandidate(ctx, pwdchk.UserAccountID, userAccountCandidate.Email, roletoken)
+	if err != nil {
+		lcr.Check.Error = err
+		lcr.Check.CheckResult = false
+
+		return lcr
+	}
+
+	//otherwise prepare return data
+	lcr.Check.Error = nil
+	lcr.Check.CheckResult = true
+	lcr.IsTwoFactor = pwdchk.IsTwoFactor
+	lcr.LoginID = lgid
 
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "Login", "info", "end")
 	}
-	return shdr, nil
+
+	return lcr
 }
 
 //GetLoginProfile returns the user account profile
@@ -413,56 +386,56 @@ func (cr *Core) GetLoginProfile(ctx context.Context, userID string, withSecure b
 }
 
 //ToggleTwoFactor switches two factor authentication on/off
-func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, period int32, toggle, qr bool) *aucm.UserAccountOtpCheck {
+func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, period int32, toggle, qr bool) *aucm.ToggleOtpResult {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "ToggleTwoFactor", "info", "start")
 	}
 
 	chkr := &aucm.CheckResult{}
-	confres := &aucm.UserAccountOtpCheck{Check: chkr}
+	otpr := &aucm.ToggleOtpResult{Check: chkr}
 
 	//get the profile
 	uacc, err := cr.Dm.GetLoginProfile(ctx, userID)
 
 	if err != nil {
-		confres.Check.CheckResult = false
-		confres.Check.Error = err
-		confres.Check.CheckMessage = err.Error()
+		otpr.Check.CheckResult = false
+		otpr.Check.Error = err
+		otpr.Check.CheckMessage = err.Error()
 
-		return confres
+		return otpr
 	}
 
 	//if 2FA is on..
 	if toggle {
 		//exit if it is already on..
 		if uacc.TwoFactorEnabled {
-			confres.Check.CheckResult = true
-			confres.Check.Error = nil
-			confres.Check.CheckMessage = "preenabled"
+			otpr.Check.CheckResult = true
+			otpr.Check.Error = nil
+			otpr.Check.CheckMessage = "preenabled"
 
-			return confres
+			return otpr
 		}
 
 		//otherwise generate a new otp key result
 		rslt, err := otp.GenerateOtp(domain, uacc.Email, uint(period))
 
 		if err != nil {
-			confres.Check.CheckResult = false
-			confres.Check.Error = err
-			confres.Check.CheckMessage = err.Error()
+			otpr.Check.CheckResult = false
+			otpr.Check.Error = err
+			otpr.Check.CheckMessage = err.Error()
 
-			return confres
+			return otpr
 		}
 
 		//turn the secret into an encrypted base64 string
 		twofachash, err := cr.Kp.EncryptBytes(ctx, []byte(rslt.Secret))
 
 		if err != nil {
-			confres.Check.CheckResult = false
-			confres.Check.Error = err
-			confres.Check.CheckMessage = err.Error()
+			otpr.Check.CheckResult = false
+			otpr.Check.Error = err
+			otpr.Check.CheckMessage = err.Error()
 
-			return confres
+			return otpr
 		}
 
 		//base64 the QR bytes
@@ -473,7 +446,7 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 		uacc.TwoFactorHash = twofachash
 
 		if qr {
-			confres.Qr = qrc
+			otpr.Qr = qrc
 		}
 	} else {
 		//or switch off 2FA and clear the secret and qr
@@ -485,18 +458,18 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 	_, err = cr.SaveAccount(ctx, uacc)
 
 	if err != nil {
-		confres.Check.CheckResult = false
-		confres.Check.Error = err
-		confres.Check.CheckMessage = err.Error()
+		otpr.Check.CheckResult = false
+		otpr.Check.Error = err
+		otpr.Check.CheckMessage = err.Error()
 
-		return confres
+		return otpr
 	}
 
-	confres.Check.CheckResult = true
-	confres.Check.Error = nil
-	confres.Check.CheckMessage = "success"
+	otpr.Check.CheckResult = true
+	otpr.Check.Error = nil
+	otpr.Check.CheckMessage = "success"
 
-	return confres
+	return otpr
 }
 
 //SaveAccount saves a user account back to the store
@@ -572,7 +545,7 @@ func (cr *Core) SavePassword(ctx context.Context, userID, newpwd string) (bool, 
 }
 
 //RequestReset despatches password reset email
-func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string, liveCall bool) (string, error) {
+func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) (string, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "CredentialReset", "info", "start")
 	}
@@ -592,7 +565,7 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string, 
 		return "", aucm.ErrAccountNotExist
 	}
 
-	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid.UserAccountID, emailAddress, aucm.CredentialReset.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthAccountConfirmationRedirectURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
+	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid.UserAccountID, emailAddress, aucm.CredentialReset.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
 
 	if err != nil {
 		return "", err
@@ -610,7 +583,7 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string, 
 		return "", aucm.ErrAccountRegNotCompleted
 	}
 
-	result, err := cr.SendMail(ctx, emconf, appName, liveCall)
+	result, err := cr.SendMail(ctx, emconf, appName, true)
 
 	if err != nil {
 		return "", err
@@ -690,7 +663,7 @@ func (cr *Core) StartAccountConfirmation(ctx context.Context, userID, email, app
 		return "", aucm.ErrEmailInvalid
 	}
 
-	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userID, email, "registration", cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthAccountConfirmationRedirectURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
+	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userID, email, "registration", cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
 
 	if err != nil {
 		return "", err
@@ -861,80 +834,47 @@ func (cr *Core) GetAccountRole(ctx context.Context, userID string) ([]*aucm.User
 }
 
 //VerifyCredential checks that an email/password combination is valid
-func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) *aucm.UserAccountPasswordCheck {
+func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) *aucm.PasswordCheckResult {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "VerifyCredential", "info", "start")
 	}
 
-	chkr := &aucm.CheckResult{}
-	cmpreslt := &aucm.UserAccountPasswordCheck{Check: chkr}
+	apr := &aucm.PasswordCheckResult{Check: &aucm.CheckResult{}}
 
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(userAccountCandidate.Email) {
-		cmpreslt.Check.Error = aucm.ErrEmailInvalid
+		apr.Check.Error = aucm.ErrEmailInvalid
+		apr.Check.CheckResult = false
 
-		return cmpreslt
+		return apr
 	}
 
 	//see if the account exists..
 	ctd, err := cr.Dm.GetAccountCount(ctx, userAccountCandidate.Email)
 
 	if err != nil {
-		cmpreslt.Check.Error = err
-		cmpreslt.Check.CheckResult = false
+		apr.Check.Error = err
+		apr.Check.CheckResult = false
 
-		return cmpreslt
+		return apr
 	}
 
 	//if the count is zero then return
 	if ctd == 0 {
-		cmpreslt.Check.Error = aucm.ErrAccountNotLocated
-		cmpreslt.Check.CheckResult = false
+		apr.Check.Error = aucm.ErrAccountNotLocated
+		apr.Check.CheckResult = false
 
-		return cmpreslt
+		return apr
 	}
 
 	//get the credential element of the account
 	candidate, err := cr.Dm.GetAccountCredential(ctx, userAccountCandidate.Email)
 
 	if err != nil {
-		cmpreslt.Check.Error = err
-		cmpreslt.Check.CheckResult = false
+		apr.Check.Error = err
+		apr.Check.CheckResult = false
 
-		return cmpreslt
-	}
-
-	//deal with 2FA first because it expires in 30 seconds
-	if candidate.TwoFactorEnabled {
-
-		if EnvDebugOn {
-			lblog.LogEvent("Core", "VerifyCredential", "2FAOTP", userAccountCandidate.Otp)
-		}
-
-		if userAccountCandidate.Otp == "" {
-			cmpreslt.Check.CheckResult = false
-			cmpreslt.Check.Error = aucm.ErrOtpNotExist
-
-			return cmpreslt
-		}
-
-		//decrypt the secret
-		secret, err := cr.Kp.DecryptString(ctx, candidate.TwoFactorHash)
-
-		if err != nil {
-			cmpreslt.Check.CheckResult = false
-			cmpreslt.Check.Error = err
-
-			return cmpreslt
-		}
-
-		//exit if the passcode was not valid
-		if !otp.VerifyOtp(userAccountCandidate.Otp, secret) {
-			cmpreslt.Check.CheckResult = false
-			cmpreslt.Check.Error = otp.ErrPasscodeNotValid
-
-			return cmpreslt
-		}
+		return apr
 	}
 
 	//prep a current time
@@ -942,10 +882,10 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 
 	//if the account is locked then return the error
 	if candidate.LockoutEnd.After(currentTime) {
-		cmpreslt.Check.Error = aucm.ErrAccountIsLocked
-		cmpreslt.Check.CheckResult = false
+		apr.Check.Error = aucm.ErrAccountIsLocked
+		apr.Check.CheckResult = false
 
-		return cmpreslt
+		return apr
 	}
 
 	//now check the credentials match
@@ -953,8 +893,8 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 
 	//if there was an error..
 	if err != nil {
-		cmpreslt.Check.CheckResult = false
-		cmpreslt.Check.Error = err
+		apr.Check.CheckResult = false
+		apr.Check.Error = err
 
 		//if the error is that the password was incorrect..
 		if err == utils.ErrCredentialsNotCorrect {
@@ -962,12 +902,12 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 			lgerr := cr.Dm.SavedFailedLogin(ctx, userAccountCandidate.Email)
 
 			if lgerr != nil {
-				cmpreslt.Check.CheckResult = false
-				cmpreslt.Check.Error = lgerr
+				apr.Check.CheckResult = false
+				apr.Check.Error = lgerr
 			}
 		}
 
-		return cmpreslt
+		return apr
 	}
 
 	//we reach this point if the credential check was successful
@@ -976,25 +916,90 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 		lgerr := cr.Dm.ResetFailedLogin(ctx, userAccountCandidate.Email)
 
 		if lgerr != nil {
-			cmpreslt.Check.CheckResult = false
-			cmpreslt.Check.Error = lgerr
+			apr.Check.CheckResult = false
+			apr.Check.Error = lgerr
 
-			return cmpreslt
+			return apr
 		}
 	}
 
+	//record 2FA status
+	apr.IsTwoFactor = candidate.TwoFactorEnabled
+	apr.UserAccountID = candidate.UserAccountID
+
 	//and finally prep the results
 	if chk {
-		cmpreslt.Check.CheckResult = chk
-		cmpreslt.UserAccountID = candidate.UserAccountID
-		cmpreslt.Check.Error = nil
+		apr.Check.CheckResult = chk
+		apr.Check.Error = nil
 	}
 
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "VerifyCredential", "info", "end")
 	}
 
-	return cmpreslt
+	return apr
+}
+
+//VerifyOtp checks
+func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *aucm.OtpCandidate) *aucm.OtpResult {
+	if EnvDebugOn {
+		lblog.LogEvent("Core", "VerifyOtp", "info", "start")
+		lblog.LogEvent("Core", "VerifyOtp", "2FAOTP", otpCandidate.Otp)
+	}
+
+	lor := &aucm.OtpResult{Check: &aucm.CheckResult{}}
+
+	if otpCandidate.Otp == "" {
+		lor.Check.CheckResult = false
+		lor.Check.Error = aucm.ErrOtpNotExist
+
+		return lor
+	}
+
+	lc, err := cr.Dm.GetLoginCandidate(ctx, otpCandidate.LoginID)
+	if err != nil {
+		lor.Check.CheckResult = false
+		lor.Check.Error = err
+
+		return lor
+	}
+
+	//get the credential element of the account
+	candidate, err := cr.Dm.GetAccountCredential(ctx, lc.Email)
+
+	if err != nil {
+		lor.Check.Error = err
+		lor.Check.CheckResult = false
+
+		return lor
+	}
+
+	//decrypt the secret
+	secret, err := cr.Kp.DecryptString(ctx, candidate.TwoFactorHash)
+
+	if err != nil {
+		lor.Check.CheckResult = false
+		lor.Check.Error = err
+
+		return lor
+	}
+
+	//exit if the passcode was not valid
+	if !otp.VerifyOtp(otpCandidate.Otp, secret) {
+		lor.Check.CheckResult = false
+		lor.Check.Error = otp.ErrPasscodeNotValid
+
+		return lor
+	}
+
+	lor.Check.CheckResult = true
+	lor.Check.CheckMessage = "passed"
+
+	if EnvDebugOn {
+		lblog.LogEvent("Core", "Login", "info", "end")
+	}
+
+	return lor
 }
 
 //SaveEmailConfirmation sets the account record to indicate email confirmation
@@ -1106,41 +1111,66 @@ func (cr *Core) SendMail(ctx context.Context, emailConfirm *aucm.UserEmailConfir
 	return true, nil
 }
 
-//GetSystemDefault returns a system default setting
-func (cr *Core) GetSystemDefault(ctx context.Context, systemKey string) (*aucm.SystemDefault, error) {
+//SaveLoginCandidate saves a login record
+func (cr *Core) SaveLoginCandidate(ctx context.Context, userID, email, roletoken string) (string, error) {
 	if EnvDebugOn {
-		lblog.LogEvent("Core", "GetSystemDefault", "info", "start")
+		lblog.LogEvent("Core", "SaveLoginCandidate", "info", "start")
+	}
+	currentTime := time.Now()
+	activatedTime := &time.Time{}
+
+	lc := &aucm.LoginCandidate{
+		UserAccountID: userID,
+		Email:         email,
+		RoleToken:     roletoken,
+		Activated:     false,
+		CreatedDate:   &currentTime,
+		ActivatedDate: activatedTime,
 	}
 
-	//get the setting
-	sd, err := cr.Dm.GetSystemDefault(ctx, systemKey)
+	logid, err := cr.Dm.SetLoginCandidate(ctx, lc)
+	if err != nil {
+		return "", err
+	}
 
+	if EnvDebugOn {
+		lblog.LogEvent("Core", "SaveLoginCandidate", "info", "end")
+	}
+	return logid, nil
+}
+
+//ActivateLoginCandidate activates the login candidate record
+func (cr *Core) ActivateLoginCandidate(ctx context.Context, loginID string) (map[string]interface{}, error) {
+	shdr := make(map[string]interface{})
+
+	currentTime := time.Now()
+
+	lc, err := cr.Dm.GetLoginCandidate(ctx, loginID)
 	if err != nil {
 		return nil, err
 	}
 
-	if EnvDebugOn {
-		lblog.LogEvent("Core", "GetSystemDefault", "info", "end")
+	//check that the login candidate has not expired
+	cd := *lc.CreatedDate
+	if currentTime.Sub(cd) > (time.Minute * 5) {
+		return nil, aucm.ErrLcExpired
 	}
 
-	return sd, nil
-}
+	//collect the map elements
+	shdr[sess.ConstJwtID] = lc.SessionID
+	shdr[sess.ConstJwtRole] = lc.RoleToken
+	shdr[sess.ConstJwtAccID] = lc.UserAccountID
+	shdr[sess.ConstJwtEml] = lc.Email
 
-//SetSystemDefault saves a system default setting
-func (cr *Core) SetSystemDefault(ctx context.Context, systemKey, systemVal string) error {
-	if EnvDebugOn {
-		lblog.LogEvent("Core", "SetSystemDefault", "info", "start")
-	}
+	//mark the record as active
+	lc.Activated = true
+	lc.ActivatedDate = &currentTime
 
-	//set the value
-	err := cr.Dm.SaveSystemDefault(ctx, systemKey, systemVal)
-
+	//and save back
+	_, err = cr.Dm.SetLoginCandidate(ctx, lc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if EnvDebugOn {
-		lblog.LogEvent("Core", "SetSystemDefault", "info", "end")
-	}
-	return nil
+	return shdr, nil
 }

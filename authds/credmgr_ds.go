@@ -31,7 +31,6 @@ func NewDsCredentialMgr(ctx context.Context, bc lbcf.ConfigSetting) (*DsCredenti
 	}
 
 	datastoreClient, err := datastore.NewClient(ctx, bc.GetConfigValue(ctx, "EnvAuthGcpProject"), option.WithGRPCConnectionPool(EnvClientPool))
-
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +56,6 @@ func (credentialMgr *DsCredentialMgr) GetAccountCredential(ctx context.Context, 
 	//projection queries don't deserialise time.Time (Date And Time in datastore) as of 30.07.2018
 	//so we have to take the entire entity and then extract the parts we want... yay...
 	candidate, err := credentialMgr.GetLoginProfileByEmail(ctx, emailAddress)
-
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +91,6 @@ func (credentialMgr *DsCredentialMgr) SavedFailedLogin(ctx context.Context, emai
 	var accountIsLocked bool
 
 	candidate, err := credentialMgr.GetLoginProfileByEmail(ctx, emailAddress)
-
 	if err != nil {
 		return err
 	}
@@ -121,7 +118,6 @@ func (credentialMgr *DsCredentialMgr) SavedFailedLogin(ctx context.Context, emai
 
 		//then save the account details back
 		_, err := credentialMgr.SaveAccount(ctx, candidate)
-
 		if err != nil {
 			return err
 		}
@@ -156,7 +152,6 @@ func (credentialMgr *DsCredentialMgr) ResetFailedLogin(ctx context.Context, emai
 
 	for {
 		_, err := it.Next(&candidate)
-
 		if err == iterator.Done {
 			break
 		}
@@ -230,7 +225,6 @@ func (credentialMgr *DsCredentialMgr) GetLoginProfile(ctx context.Context, userI
 	}
 
 	id, err := strconv.ParseInt(userID, 10, 64)
-
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +270,6 @@ func (credentialMgr *DsCredentialMgr) GetLoginProfileByEmail(ctx context.Context
 
 	for {
 		_, err := it.Next(&candidate)
-
 		if err == iterator.Done {
 			break
 		}
@@ -306,7 +299,6 @@ func (credentialMgr *DsCredentialMgr) GetAccountApp(ctx context.Context, userID 
 	}
 
 	uacc, err := credentialMgr.GetLoginProfile(ctx, userID)
-
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +322,6 @@ func (credentialMgr *DsCredentialMgr) SaveAccount(ctx context.Context, userAccou
 	userAccount.LastTouched = &nowTime
 
 	id, err := strconv.ParseInt(userAccount.UserAccountID, 10, 64)
-
 	if err != nil {
 		return "", err
 	}
@@ -339,7 +330,6 @@ func (credentialMgr *DsCredentialMgr) SaveAccount(ctx context.Context, userAccou
 	accountKey.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
 
 	tx, err := credentialMgr.CmDsClient.NewTransaction(ctx)
-
 	if err != nil {
 		return "", err
 	}
@@ -373,7 +363,6 @@ func (credentialMgr *DsCredentialMgr) StartAccountConfirmation(ctx context.Conte
 	expiryTime := currentTime.Add(time.Hour * 24)
 
 	acctokenKey, err := utils.NewDsKey(ctx, credentialMgr.CmDsClient, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountConfirmKind"))
-
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +411,6 @@ func (credentialMgr *DsCredentialMgr) GetAccountConfirmation(ctx context.Context
 	}
 
 	id, err := strconv.ParseInt(userAccountToken, 10, 64)
-
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +421,6 @@ func (credentialMgr *DsCredentialMgr) GetAccountConfirmation(ctx context.Context
 	var accToken aucm.UserAccountConfirmation
 
 	err = credentialMgr.CmDsClient.Get(ctx, accountKey, &accToken)
-
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
 			return nil, aucm.ErrConfirmTokenInvalid
@@ -456,7 +443,6 @@ func (credentialMgr *DsCredentialMgr) SaveAccountConfirmation(ctx context.Contex
 	res := &aucm.UserAccountConfirmationResult{Result: false}
 
 	id, err := strconv.ParseInt(userAccountConf.ConfirmToken, 10, 64)
-
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +453,6 @@ func (credentialMgr *DsCredentialMgr) SaveAccountConfirmation(ctx context.Contex
 	var tx *datastore.Transaction
 
 	tx, err = credentialMgr.CmDsClient.NewTransaction(ctx)
-
 	if err != nil {
 		return res, err
 	}
@@ -499,86 +484,82 @@ func (credentialMgr *DsCredentialMgr) SaveAccountConfirmation(ctx context.Contex
 	return res, nil
 }
 
-//GetSystemDefault returns a system default value
-func (credentialMgr *DsCredentialMgr) GetSystemDefault(ctx context.Context, systemKey string) (*aucm.SystemDefault, error) {
+//SetLoginCandidate writes a login candidate to datastore
+func (credentialMgr *DsCredentialMgr) SetLoginCandidate(ctx context.Context, lc *aucm.LoginCandidate) (string, error) {
 	if EnvDebugOn {
-		lblog.LogEvent("DsCredentialMgr", "GetSystemDefault", "info", "start")
+		lblog.LogEvent("DsCredentialMgr", "setLoginCandidate", "info", "start")
 	}
 
-	setky := datastore.NameKey(credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsSysDefaultKind"), systemKey, nil)
-	setky.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
+	var key *datastore.Key
 
-	var setting aucm.SystemDefault
-
-	err := credentialMgr.CmDsClient.Get(ctx, setky, &setting)
-
-	if err != nil {
-		if err == datastore.ErrNoSuchEntity {
-			return nil, aucm.ErrSysDefNotExist
+	if lc.SessionID == "" {
+		key1, err := utils.NewDsKey(ctx, credentialMgr.CmDsClient, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsLoginKind"))
+		if err != nil {
+			return "", err
 		}
-		return nil, err
+
+		key = key1
+		lc.SessionID = strconv.FormatInt(key.ID, 10)
+	} else {
+		id, err := strconv.ParseInt(lc.SessionID, 10, 64)
+		if err != nil {
+			return "", err
+		}
+
+		key1 := datastore.IDKey(credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsLoginKind"), id, nil)
+		key1.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
+
+		key = key1
 	}
-
-	if setting.ItemKey == "" {
-		return nil, aucm.ErrSysDefNotExist
-	}
-
-	if EnvDebugOn {
-		lblog.LogEvent("DsCredentialMgr", "GetSystemDefault", "info", "end")
-	}
-	return &setting, nil
-}
-
-//SaveSystemDefault sets a system default value
-func (credentialMgr *DsCredentialMgr) SaveSystemDefault(ctx context.Context, systemKey, systemVal string) error {
-	if EnvDebugOn {
-		lblog.LogEvent("DsCredentialMgr", "SaveSystemDefault", "info", "start")
-	}
-
-	sysdef := &aucm.SystemDefault{ItemKey: systemKey, ItemValue: systemVal}
-
-	setky := datastore.NameKey(credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsSysDefaultKind"), systemKey, nil)
-	setky.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
 
 	tx, err := credentialMgr.CmDsClient.NewTransaction(ctx)
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	if _, err := tx.Put(setky, sysdef); err != nil {
+	if _, err := tx.Put(key, lc); err != nil {
 		tx.Rollback()
-		return err
+		return "", err
 	}
 
 	if _, err = tx.Commit(); err != nil {
-		return err
+		return "", err
 	}
 
 	if EnvDebugOn {
-		lblog.LogEvent("DsCredentialMgr", "SaveSystemDefault", "info", "end")
+		lblog.LogEvent("DsCredentialMgr", "setLoginCandidate", "info", "end")
 	}
-	return nil
+
+	return lc.SessionID, nil
 }
 
-//NewAccountID returns a new id key for the account entity
-func (credentialMgr *DsCredentialMgr) NewAccountID(ctx context.Context) (string, error) {
-	key, err := utils.NewDsKey(ctx, credentialMgr.CmDsClient, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountKind"))
-
-	if err != nil {
-		return "", err
+//GetLoginCandidate returns a login candidate record
+func (credentialMgr *DsCredentialMgr) GetLoginCandidate(ctx context.Context, loginID string) (*aucm.LoginCandidate, error) {
+	if EnvDebugOn {
+		lblog.LogEvent("DsCredentialMgr", "GetLoginCandidate", "info", "start")
 	}
 
-	return strconv.FormatInt(key.ID, 10), nil
-}
-
-//NewConfirmID returns a new id key for the confirmation entity
-func (credentialMgr *DsCredentialMgr) NewConfirmID(ctx context.Context) (string, error) {
-	key, err := utils.NewDsKey(ctx, credentialMgr.CmDsClient, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountConfirmKind"))
-
+	id, err := strconv.ParseInt(loginID, 10, 64)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return strconv.FormatInt(key.ID, 10), nil
+	key := datastore.IDKey(credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsLoginKind"), id, nil)
+	key.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
+
+	var lc aucm.LoginCandidate
+
+	err = credentialMgr.CmDsClient.Get(ctx, key, &lc)
+	if err != nil {
+		if err == datastore.ErrNoSuchEntity {
+			return nil, aucm.ErrLcNotExist
+		}
+		return nil, err
+	}
+
+	if EnvDebugOn {
+		lblog.LogEvent("DsCredentialMgr", "GetLoginCandidate", "info", "end")
+	}
+	return &lc, nil
 }

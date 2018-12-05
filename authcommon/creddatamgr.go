@@ -8,7 +8,6 @@ import (
 type CredentialDataMgr interface {
 	AccountMeta
 	AccountUpdate
-	SystemSetting
 	GenAuthID
 }
 
@@ -29,12 +28,6 @@ type AccountUpdate interface {
 	SaveAccount(ctx context.Context, userAccount *UserAccount) (string, error)
 	StartAccountConfirmation(ctx context.Context, userID, emailAddress, userAccountConfirmationType, url, urlrd, sender, sendername string) (*UserEmailConfirm, error)
 	SaveAccountConfirmation(ctx context.Context, userAccountConf *UserAccountConfirmation) (*UserAccountConfirmationResult, error)
-}
-
-//SystemSetting defines an operation to retrieve a system setting (key/value)
-type SystemSetting interface {
-	GetSystemDefault(ctx context.Context, systemKey string) (*SystemDefault, error)
-	SaveSystemDefault(ctx context.Context, systemKey, systemVal string) error
 }
 
 //GenAuthID defines operations to create new entity ids

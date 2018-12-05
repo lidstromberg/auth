@@ -35,4 +35,8 @@ var (
 	ErrOtpNotExist = errors.New("two factor authentication passcode was not supplied")
 	//ErrSysDefNotExist message indicates a system default was not located
 	ErrSysDefNotExist = errors.New("system default was not located")
+	//ErrLcNotExist error message
+	ErrLcNotExist = errors.New("the login candidate does not exist")
+	//ErrLcExpired error message
+	ErrLcExpired = errors.New("the login candidate has expired")
 )
