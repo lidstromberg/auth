@@ -288,7 +288,7 @@ func Test_FinishAccountConfirmation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_finishacconf@here.com", Password: "Pass1"}
+	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -336,13 +336,13 @@ func Test_HasAccess(t *testing.T) {
 
 	uacc2 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	result, err := svb.HasAccess(ctx, uacc2.Email, appName)
+	result, err := svb.HasAccess(ctx, uacc2.Email, "noaccesstoapp")
 	if err != nil && err != aucm.ErrAppRoleAccessDenied {
 		t.Fatal(err)
 	}
 
 	if result {
-		t.Fatal("account should not have app access yet")
+		t.Fatal("account should not have app access")
 	}
 }
 func Test_GetAccountRoleToken(t *testing.T) {
@@ -542,7 +542,7 @@ func Test_SendMail(t *testing.T) {
 		Email:                       shdr1[sess.ConstJwtEml].(string),
 		ConfirmToken:                utils.NewID(),
 		ConfirmURL:                  "EnvAuthMailAccountConfirmationURL",
-		EmailSender:                 "EnvAuthMailSenderAccount",
+		EmailSender:                 "test_reglog@here.com",
 		UserAccountConfirmationType: aucm.Registration.String(),
 	}
 
@@ -625,4 +625,43 @@ func Test_SaveAccountApp(t *testing.T) {
 	}
 
 	t.Logf("userid: %s", userid)
+}
+
+func Test_SaveLoginCandidate(t *testing.T) {
+	ctx := context.Background()
+
+	svb, err := createNewCore(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lgid, err := svb.SaveLoginCandidate(ctx, "dummyUser1", "session@sessiontest.com", "testapp1:testapp2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("LoginID : %s", lgid)
+}
+
+func Test_ActivateLoginCandidate(t *testing.T) {
+	ctx := context.Background()
+
+	svb, err := createNewCore(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lgid, err := svb.SaveLoginCandidate(ctx, "dummyUser1", "session@sessiontest.com", "testapp1:testapp2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("LoginID : %s", lgid)
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("Header : %v", shdr1)
 }

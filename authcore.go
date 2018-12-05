@@ -290,7 +290,7 @@ func (cr *Core) Login(ctx context.Context, userAccountCandidate *aucm.UserAccoun
 	}
 
 	//setup the return value
-	lcr := &aucm.LoginCheckResult{}
+	lcr := &aucm.LoginCheckResult{Check: &aucm.CheckResult{}}
 
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(userAccountCandidate.Email) {
@@ -353,7 +353,6 @@ func (cr *Core) Login(ctx context.Context, userAccountCandidate *aucm.UserAccoun
 	}
 
 	//otherwise prepare return data
-	lcr.Check.Error = nil
 	lcr.Check.CheckResult = true
 	lcr.IsTwoFactor = pwdchk.IsTwoFactor
 	lcr.LoginID = lgid
@@ -372,7 +371,6 @@ func (cr *Core) GetLoginProfile(ctx context.Context, userID string, withSecure b
 	}
 
 	useracc, err := cr.Dm.GetLoginProfile(ctx, userID)
-
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +397,6 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 
 	//get the profile
 	uacc, err := cr.Dm.GetLoginProfile(ctx, userID)
-
 	if err != nil {
 		otpr.Check.CheckResult = false
 		otpr.Check.Error = err
@@ -421,7 +418,6 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 
 		//otherwise generate a new otp key result
 		rslt, err := otp.GenerateOtp(domain, uacc.Email, uint(period))
-
 		if err != nil {
 			otpr.Check.CheckResult = false
 			otpr.Check.Error = err
@@ -432,7 +428,6 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 
 		//turn the secret into an encrypted base64 string
 		twofachash, err := cr.Kp.EncryptBytes(ctx, []byte(rslt.Secret))
-
 		if err != nil {
 			otpr.Check.CheckResult = false
 			otpr.Check.Error = err
@@ -459,7 +454,6 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 
 	//save the account
 	_, err = cr.SaveAccount(ctx, uacc)
-
 	if err != nil {
 		otpr.Check.CheckResult = false
 		otpr.Check.Error = err
@@ -496,7 +490,6 @@ func (cr *Core) SaveAccount(ctx context.Context, userAccount *aucm.UserAccount) 
 	}
 
 	result, err := cr.Dm.SaveAccount(ctx, userAccount)
-
 	if err != nil {
 		return "", err
 	}
@@ -515,14 +508,12 @@ func (cr *Core) SavePassword(ctx context.Context, userID, newpwd string) (bool, 
 
 	//hash the new password
 	pwdHash, err := utils.GetStringHash(newpwd)
-
 	if err != nil {
 		return false, err
 	}
 
 	//get the account
 	userAccount, err := cr.Dm.GetLoginProfile(ctx, userID)
-
 	if err != nil {
 		return false, err
 	}
@@ -532,7 +523,6 @@ func (cr *Core) SavePassword(ctx context.Context, userID, newpwd string) (bool, 
 
 	//save the account
 	uaccid, err := cr.Dm.SaveAccount(ctx, userAccount)
-
 	if err != nil {
 		return false, err
 	}
@@ -559,7 +549,6 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 	}
 
 	userid, err := cr.Dm.GetLoginProfileByEmail(ctx, emailAddress)
-
 	if err != nil {
 		return "", err
 	}
@@ -569,7 +558,6 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 	}
 
 	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid.UserAccountID, emailAddress, aucm.CredentialReset.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
-
 	if err != nil {
 		return "", err
 	}
@@ -587,7 +575,6 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 	}
 
 	result, err := cr.SendMail(ctx, emconf, appName, true)
-
 	if err != nil {
 		return "", err
 	}
@@ -609,7 +596,6 @@ func (cr *Core) FinishReset(ctx context.Context, userAccountToken, newpwd string
 	}
 
 	accconf, err := cr.Dm.GetAccountConfirmation(ctx, userAccountToken)
-
 	if err != nil {
 		return nil, err
 	}
@@ -625,7 +611,6 @@ func (cr *Core) FinishReset(ctx context.Context, userAccountToken, newpwd string
 
 	//save/verify the token
 	confres, err := cr.Dm.SaveAccountConfirmation(ctx, accconf)
-
 	if err != nil {
 		return nil, err
 	}
@@ -636,14 +621,12 @@ func (cr *Core) FinishReset(ctx context.Context, userAccountToken, newpwd string
 
 	//mark the email confirmed flag on the account
 	_, err = cr.SaveEmailConfirmation(ctx, accconf)
-
 	if err != nil {
 		return nil, err
 	}
 
 	//save the new password against the account
 	_, err = cr.SavePassword(ctx, accconf.UserAccountID, newpwd)
-
 	if err != nil {
 		return nil, err
 	}
@@ -667,7 +650,6 @@ func (cr *Core) StartAccountConfirmation(ctx context.Context, userID, email, app
 	}
 
 	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userID, email, "registration", cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
-
 	if err != nil {
 		return "", err
 	}
@@ -685,7 +667,6 @@ func (cr *Core) StartAccountConfirmation(ctx context.Context, userID, email, app
 	}
 
 	result, err := cr.SendMail(ctx, emconf, appName, liveCall)
-
 	if err != nil {
 		return "", err
 	}
@@ -707,7 +688,6 @@ func (cr *Core) FinishAccountConfirmation(ctx context.Context, userAccountToken 
 	}
 
 	accconf, err := cr.Dm.GetAccountConfirmation(ctx, userAccountToken)
-
 	if err != nil {
 		return nil, err
 	}
@@ -723,7 +703,6 @@ func (cr *Core) FinishAccountConfirmation(ctx context.Context, userAccountToken 
 
 	//save/verify the token
 	confres, err := cr.Dm.SaveAccountConfirmation(ctx, accconf)
-
 	if err != nil {
 		return nil, err
 	}
@@ -734,7 +713,6 @@ func (cr *Core) FinishAccountConfirmation(ctx context.Context, userAccountToken 
 
 	//mark the email confirmed flag on the account
 	_, err = cr.SaveEmailConfirmation(ctx, accconf)
-
 	if err != nil {
 		return nil, err
 	}
@@ -759,7 +737,6 @@ func (cr *Core) HasAccess(ctx context.Context, emailAddress, appName string) (bo
 
 	//get the profile
 	uacc1, err := cr.Dm.GetLoginProfileByEmail(ctx, emailAddress)
-
 	if err != nil {
 		return false, err
 	}
@@ -791,7 +768,6 @@ func (cr *Core) GetAccountRoleToken(ctx context.Context, userID string) (string,
 
 	//get the profile
 	uacc1, err := cr.Dm.GetLoginProfile(ctx, userID)
-
 	if err != nil {
 		return "", err
 	}
@@ -810,7 +786,6 @@ func (cr *Core) GetAccountRoleToken(ctx context.Context, userID string) (string,
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "GetAccountRoleToken", "info", "end")
 	}
-
 	return userAppRoleKey.String(), nil
 }
 
@@ -822,7 +797,6 @@ func (cr *Core) GetAccountRole(ctx context.Context, userID string) ([]*aucm.User
 
 	//get the profile
 	uacc1, err := cr.Dm.GetLoginProfile(ctx, userID)
-
 	if err != nil {
 		return nil, err
 	}
@@ -832,7 +806,6 @@ func (cr *Core) GetAccountRole(ctx context.Context, userID string) ([]*aucm.User
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "GetAccountRole", "info", "end")
 	}
-
 	return accapps, nil
 }
 
@@ -854,7 +827,6 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 
 	//see if the account exists..
 	ctd, err := cr.Dm.GetAccountCount(ctx, userAccountCandidate.Email)
-
 	if err != nil {
 		apr.Check.Error = err
 		apr.Check.CheckResult = false
@@ -872,7 +844,6 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 
 	//get the credential element of the account
 	candidate, err := cr.Dm.GetAccountCredential(ctx, userAccountCandidate.Email)
-
 	if err != nil {
 		apr.Check.Error = err
 		apr.Check.CheckResult = false
@@ -939,7 +910,6 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "VerifyCredential", "info", "end")
 	}
-
 	return apr
 }
 
@@ -969,7 +939,6 @@ func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *aucm.OtpCandidate) 
 
 	//get the credential element of the account
 	candidate, err := cr.Dm.GetAccountCredential(ctx, lc.Email)
-
 	if err != nil {
 		lor.Check.Error = err
 		lor.Check.CheckResult = false
@@ -979,7 +948,6 @@ func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *aucm.OtpCandidate) 
 
 	//decrypt the secret
 	secret, err := cr.Kp.DecryptString(ctx, candidate.TwoFactorHash)
-
 	if err != nil {
 		lor.Check.CheckResult = false
 		lor.Check.Error = err
@@ -999,9 +967,8 @@ func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *aucm.OtpCandidate) 
 	lor.Check.CheckMessage = "passed"
 
 	if EnvDebugOn {
-		lblog.LogEvent("Core", "Login", "info", "end")
+		lblog.LogEvent("Core", "VerifyOtp", "info", "end")
 	}
-
 	return lor
 }
 
@@ -1016,7 +983,6 @@ func (cr *Core) SaveEmailConfirmation(ctx context.Context, userAccountConf *aucm
 
 	if userAccountConf.UserAccountConfirmationType == aucm.Registration.String() {
 		uacc, err := cr.Dm.GetLoginProfile(ctx, userAccountConf.UserAccountID)
-
 		if err != nil {
 			return res, err
 		}
@@ -1030,7 +996,6 @@ func (cr *Core) SaveEmailConfirmation(ctx context.Context, userAccountConf *aucm
 			uacc.LastTouched = &currentTime
 
 			uaccid, err := cr.Dm.SaveAccount(ctx, uacc)
-
 			if err != nil {
 				return res, err
 			}
@@ -1092,7 +1057,6 @@ func (cr *Core) SendMail(ctx context.Context, emailConfirm *aucm.UserEmailConfir
 
 	if liveCall {
 		response, err := cr.Mc.Send(message)
-
 		if err != nil {
 			return false, err
 		}

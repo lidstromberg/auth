@@ -59,7 +59,7 @@ func Test_SaveTwoFactor(t *testing.T) {
 
 	ioutil.WriteFile("qr-code.png", data, 0644)
 
-	prof1, err = svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string), true)
+	prof1, err = svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func Test_ValidateTwoFactor(t *testing.T) {
 	}
 
 	//replace this code with the number from your authenticator app
-	ulogin2 := &aucm.OtpCandidate{LoginID: lgres.LoginID, Otp: "793687"}
+	ulogin2 := &aucm.OtpCandidate{LoginID: lgres.LoginID, Otp: "212462"}
 
 	otr := svb.VerifyOtp(ctx, ulogin2)
 	if otr.Check.Error != nil {
