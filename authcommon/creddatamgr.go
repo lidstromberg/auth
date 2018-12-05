@@ -8,7 +8,7 @@ import (
 type CredentialDataMgr interface {
 	AccountMeta
 	AccountUpdate
-	GenAuthID
+	LoginTracker
 }
 
 //AccountMeta defines operations to retrieve account metadata
@@ -30,10 +30,10 @@ type AccountUpdate interface {
 	SaveAccountConfirmation(ctx context.Context, userAccountConf *UserAccountConfirmation) (*UserAccountConfirmationResult, error)
 }
 
-//GenAuthID defines operations to create new entity ids
-type GenAuthID interface {
-	NewAccountID(ctx context.Context) (string, error)
-	NewConfirmID(ctx context.Context) (string, error)
+//LoginTracker defines operations to track logins
+type LoginTracker interface {
+	SetLoginCandidate(ctx context.Context, lc *LoginCandidate) (string, error)
+	GetLoginCandidate(ctx context.Context, loginID string) (*LoginCandidate, error)
 }
 
 //CredentialDataMgrStore enum for credential services
