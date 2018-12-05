@@ -492,16 +492,16 @@ func (credentialMgr *DsCredentialMgr) SetLoginCandidate(ctx context.Context, lc 
 
 	var key *datastore.Key
 
-	if lc.SessionID == "" {
+	if lc.LoginID == "" {
 		key1, err := utils.NewDsKey(ctx, credentialMgr.CmDsClient, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsLoginKind"))
 		if err != nil {
 			return "", err
 		}
 
 		key = key1
-		lc.SessionID = strconv.FormatInt(key.ID, 10)
+		lc.LoginID = strconv.FormatInt(key.ID, 10)
 	} else {
-		id, err := strconv.ParseInt(lc.SessionID, 10, 64)
+		id, err := strconv.ParseInt(lc.LoginID, 10, 64)
 		if err != nil {
 			return "", err
 		}
