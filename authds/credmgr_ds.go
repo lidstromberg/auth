@@ -531,7 +531,7 @@ func (credentialMgr *DsCredentialMgr) SetLoginCandidate(ctx context.Context, lc 
 		lblog.LogEvent("DsCredentialMgr", "setLoginCandidate", "info", "end")
 	}
 
-	return lc.SessionID, nil
+	return lc.LoginID, nil
 }
 
 //GetLoginCandidate returns a login candidate record
