@@ -36,5 +36,5 @@ export LBAUTH_SQLCNX="host=127.0.0.1:5432 dbname={{DBNAME}} user={{USER}} passwo
 export LBAUTH_ACCNAMESP="auth"
 export LBAUTH_KD_ACCCNF="useraccountconfirmation"
 export LBAUTH_KD_ACC="useraccount"
-export LBAUTH_KD_SYSDEF="systemdefault"
+export LBAUTH_KD_LOGIN="login"
 export LBAUTH_CLIPOOL="5"

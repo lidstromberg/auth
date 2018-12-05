@@ -12,22 +12,29 @@ import (
 
 func Test_SaveTwoFactor(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	shdr, err := svb.Login(ctx, ulogin1, appName)
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
+	}
 
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	prof1, err := svb.GetLoginProfile(ctx, shdr[sess.ConstJwtAccID].(string), true)
-
+	prof1, err := svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,22 +47,19 @@ func Test_SaveTwoFactor(t *testing.T) {
 
 	t.Logf("Two factor 1st: %t", tf)
 
-	rslt := svb.ToggleTwoFactor(ctx, "localhost", shdr[sess.ConstJwtAccID].(string), 30, true, true)
-
+	rslt := svb.ToggleTwoFactor(ctx, "localhost", shdr1[sess.ConstJwtAccID].(string), 30, true, true)
 	if rslt.Check.Error != nil {
 		t.Fatal(rslt.Check.Error)
 	}
 
 	data, err := base64.StdEncoding.DecodeString(rslt.Qr)
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ioutil.WriteFile("qr-code.png", data, 0644)
 
-	prof1, err = svb.GetLoginProfile(ctx, shdr[sess.ConstJwtAccID].(string), true)
-
+	prof1, err = svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,28 +95,31 @@ func Test_ValidateTwoFactor(t *testing.T) {
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	chk := svb.LoginCheck(ctx, ulogin1.Email)
-
-	if chk.Check.Error != nil {
-		t.Fatal(chk.Check.Error)
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
 	}
 
-	if chk.IsLocked {
-		t.Fatal("account is locked")
-	}
-
-	if !chk.IsTwoFactor {
-		t.Fatal("account is not 2FA")
+	if !lgres.IsTwoFactor {
+		t.Fatal("this should be a otp account")
 	}
 
 	//replace this code with the number from your authenticator app
-	ulogin1.Otp = "793687"
+	ulogin2 := &aucm.OtpCandidate{LoginID: lgres.LoginID, Otp: "793687"}
 
-	shdr, err := svb.Login(ctx, ulogin1, appName)
+	otr := svb.VerifyOtp(ctx, ulogin2)
+	if otr.Check.Error != nil {
+		t.Fatal(otr.Check.Error)
+	}
 
+	if !otr.Check.CheckResult {
+		t.Fatal("check was not passed")
+	}
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Logf("session header: %v", shdr)
+	t.Logf("session header: %v", shdr1)
 }

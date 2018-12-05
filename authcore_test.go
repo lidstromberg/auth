@@ -6,11 +6,11 @@ import (
 	"time"
 
 	aucm "github.com/lidstromberg/auth/authcommon"
-	utils "github.com/lidstromberg/auth/utils"
 	lbcf "github.com/lidstromberg/config"
 	kp "github.com/lidstromberg/keypair"
 	sess "github.com/lidstromberg/session"
 	stor "github.com/lidstromberg/storage"
+	utils "github.com/lidstromberg/utils"
 
 	sendgrid "github.com/sendgrid/sendgrid-go"
 	"golang.org/x/net/context"
@@ -95,44 +95,60 @@ func Test_Register(t *testing.T) {
 	}
 
 	uacc2 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
-	shdr1, err := svb.Register(ctx, uacc2, appName)
 
-	if err != nil {
-		t.Fatal(err)
+	result := svb.Register(ctx, uacc2, appName)
+	if result.Check.Error != nil {
+		t.Fatal(result.Check.Error)
 	}
 
-	t.Logf("Register account: %s", shdr1[sess.ConstJwtAccID].(string))
+	t.Logf("Register confirm token: %s", result.ConfirmToken)
 }
 func Test_Login(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	shdr, err := svb.Login(ctx, ulogin1, appName)
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
+	}
 
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Logf("session header: %v", shdr)
+	t.Logf("session header: %v", shdr1)
 }
 func Test_GetLoginProfile(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	shdr1, err := svb.Login(ctx, ulogin1, appName)
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
+	}
 
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,22 +167,29 @@ func Test_GetLoginProfile(t *testing.T) {
 }
 func Test_SaveAccount(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	shdr1, err := svb.Login(ctx, ulogin1, appName)
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
+	}
 
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	prof1, err := svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string), false)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,16 +230,15 @@ func Test_SaveAccount(t *testing.T) {
 }
 func Test_RequestReset(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	conftoken, err := svb.RequestReset(ctx, ulogin1.Email, appName, false)
-
+	conftoken, err := svb.RequestReset(ctx, ulogin1.Email, appName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,24 +247,29 @@ func Test_RequestReset(t *testing.T) {
 }
 func Test_StartAccountConfirmation(t *testing.T) {
 	ctx := context.Background()
+
 	svb, err := createNewCore(ctx)
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_startacconf@here.com", Password: "Pass1"}
+	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	shdr, err := svb.Register(ctx, ulogin1, appName)
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
+	}
 
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Logf("session header: %v", shdr)
-
-	conftoken, err := svb.StartAccountConfirmation(ctx, shdr[sess.ConstJwtAccID].(string), shdr[sess.ConstJwtEml].(string), appName, false)
-
+	conftoken, err := svb.StartAccountConfirmation(ctx, shdr1[sess.ConstJwtAccID].(string), shdr1[sess.ConstJwtEml].(string), appName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,23 +282,29 @@ func Test_StartAccountConfirmation(t *testing.T) {
 }
 func Test_FinishAccountConfirmation(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_finishacconf@here.com", Password: "Pass1"}
-	shdr, err := svb.Register(ctx, ulogin1, appName)
 
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
+	}
+
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Logf("Register account: %s", shdr[sess.ConstJwtAccID].(string))
-
-	conftoken, err := svb.StartAccountConfirmation(ctx, shdr[sess.ConstJwtAccID].(string), shdr[sess.ConstJwtEml].(string), appName, false)
-
+	conftoken, err := svb.StartAccountConfirmation(ctx, shdr1[sess.ConstJwtAccID].(string), shdr1[sess.ConstJwtEml].(string), appName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +316,6 @@ func Test_FinishAccountConfirmation(t *testing.T) {
 	t.Logf("conftoken: %s", conftoken)
 
 	confres, err := svb.FinishAccountConfirmation(ctx, conftoken)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,8 +328,8 @@ func Test_FinishAccountConfirmation(t *testing.T) {
 }
 func Test_HasAccess(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +337,6 @@ func Test_HasAccess(t *testing.T) {
 	uacc2 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	result, err := svb.HasAccess(ctx, uacc2.Email, appName)
-
 	if err != nil && err != aucm.ErrAppRoleAccessDenied {
 		t.Fatal(err)
 	}
@@ -316,24 +347,31 @@ func Test_HasAccess(t *testing.T) {
 }
 func Test_GetAccountRoleToken(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	shdr, err := svb.Login(ctx, ulogin1, appName)
-
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		t.Logf("session header was %s", shdr[sess.ConstJwtEml].(string))
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
 	}
 
-	roletoken, err := svb.GetAccountRoleToken(ctx, shdr[sess.ConstJwtAccID].(string))
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
 
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("session header was %s", shdr1[sess.ConstJwtEml].(string))
+
+	roletoken, err := svb.GetAccountRoleToken(ctx, shdr1[sess.ConstJwtAccID].(string))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,24 +380,31 @@ func Test_GetAccountRoleToken(t *testing.T) {
 }
 func Test_GetAccountRole(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	shdr, err := svb.Login(ctx, ulogin1, appName)
-
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		t.Logf("session header was returned %s", shdr[sess.ConstJwtEml].(string))
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
 	}
 
-	accapps, err := svb.GetAccountRole(ctx, shdr[sess.ConstJwtAccID].(string))
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
 
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("session header was returned %s", shdr1[sess.ConstJwtEml].(string))
+
+	accapps, err := svb.GetAccountRole(ctx, shdr1[sess.ConstJwtAccID].(string))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,8 +419,8 @@ func Test_GetAccountRole(t *testing.T) {
 }
 func Test_VerifyCredential(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +428,6 @@ func Test_VerifyCredential(t *testing.T) {
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	check := svb.VerifyCredential(ctx, ulogin1)
-
 	if check.Check.Error != nil {
 		t.Fatal(check.Check.Error)
 	}
@@ -397,7 +441,6 @@ func Test_VerifyCredential(t *testing.T) {
 	ulogin1.Password = "Pass99"
 
 	check = svb.VerifyCredential(ctx, ulogin1)
-
 	if check.Check.Error != nil {
 		if check.Check.Error == utils.ErrCredentialsNotCorrect {
 			t.Log("Bad password correctly rejected")
@@ -412,24 +455,29 @@ func Test_VerifyCredential(t *testing.T) {
 }
 func Test_SaveEmailConfirmation(t *testing.T) {
 	ctx := context.Background()
+
 	svb, err := createNewCore(ctx)
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_emailconf@here.com", Password: "Pass1"}
+	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	shdr, err := svb.Register(ctx, ulogin1, appName)
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
+	}
 
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Logf("session header: %v", shdr)
-
-	conftoken, err := svb.StartAccountConfirmation(ctx, shdr[sess.ConstJwtAccID].(string), shdr[sess.ConstJwtEml].(string), appName, false)
-
+	conftoken, err := svb.StartAccountConfirmation(ctx, shdr1[sess.ConstJwtAccID].(string), shdr1[sess.ConstJwtEml].(string), appName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,8 +493,8 @@ func Test_SaveEmailConfirmation(t *testing.T) {
 
 	uac1 := aucm.UserAccountConfirmation{
 		ConfirmToken:                conftoken,
-		Email:                       shdr[sess.ConstJwtEml].(string),
-		UserAccountID:               shdr[sess.ConstJwtAccID].(string),
+		Email:                       shdr1[sess.ConstJwtEml].(string),
+		UserAccountID:               shdr1[sess.ConstJwtAccID].(string),
 		TokenUsed:                   false,
 		UserAccountConfirmationType: "registration",
 		RedirectLink:                "link",
@@ -456,7 +504,6 @@ func Test_SaveEmailConfirmation(t *testing.T) {
 	}
 
 	confres, err := svb.SaveEmailConfirmation(ctx, &uac1)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,24 +516,30 @@ func Test_SaveEmailConfirmation(t *testing.T) {
 }
 func Test_SendMail(t *testing.T) {
 	ctx := context.Background()
-	svb, err := createNewCore(ctx)
 
+	svb, err := createNewCore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
-	shdr, err := svb.Login(ctx, ulogin1, appName)
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
+	}
 
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
+
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Logf("session header: %v", shdr)
-
 	uec := &aucm.UserEmailConfirm{
-		Email:                       shdr[sess.ConstJwtEml].(string),
+		Email:                       shdr1[sess.ConstJwtEml].(string),
 		ConfirmToken:                utils.NewID(),
 		ConfirmURL:                  "EnvAuthMailAccountConfirmationURL",
 		EmailSender:                 "EnvAuthMailSenderAccount",
@@ -494,7 +547,6 @@ func Test_SendMail(t *testing.T) {
 	}
 
 	result, err := svb.SendMail(ctx, uec, appName, false)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -509,22 +561,29 @@ func Test_SaveAccountApp(t *testing.T) {
 
 	ctx := context.Background()
 	svb, err := createNewCore(ctx)
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
-	shdr, err := svb.Login(ctx, ulogin1, appName)
 
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		t.Logf("sessid was returned %s", shdr[sess.ConstJwtID].(string))
+	lgres := svb.Login(ctx, ulogin1, appName)
+	if lgres.Check.Error != nil {
+		t.Fatal(lgres.Check.Error)
 	}
 
-	uacc, err := svb.GetLoginProfile(ctx, shdr[sess.ConstJwtAccID].(string), false)
+	if lgres.IsTwoFactor {
+		t.Fatal("this is an otp account")
+	}
 
+	shdr1, err := svb.ActivateLoginCandidate(ctx, lgres.LoginID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("sessid was returned %s", shdr1[sess.ConstJwtID].(string))
+
+	uacc, err := svb.GetLoginProfile(ctx, shdr1[sess.ConstJwtAccID].(string), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -557,7 +616,6 @@ func Test_SaveAccountApp(t *testing.T) {
 	uacc.Scopes = scopes
 
 	userid, err := svb.SaveAccount(ctx, uacc)
-
 	if err != nil {
 		t.Fatal(err)
 	}

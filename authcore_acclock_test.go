@@ -4,8 +4,7 @@ import (
 	"testing"
 
 	aucm "github.com/lidstromberg/auth/authcommon"
-	utils "github.com/lidstromberg/auth/utils"
-	sess "github.com/lidstromberg/session"
+	utils "github.com/lidstromberg/utils"
 	"golang.org/x/net/context"
 )
 
@@ -19,12 +18,11 @@ func Test_VerifyCredential_CauseLockout(t *testing.T) {
 
 	//first register the account to test
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_causelockout@here.com", Password: "Pass1"}
-	shdr, err := svb.Register(ctx, ulogin1, appName)
-
-	if err != nil {
-		t.Fatal(err)
+	result := svb.Register(ctx, ulogin1, appName)
+	if result.Check.Error != nil {
+		t.Fatal(result.Check.Error)
 	}
-	t.Logf("Register account: %s", shdr[sess.ConstJwtAccID].(string))
+	t.Logf("Register confirm token: %s", result.ConfirmToken)
 
 	//wrong password.. should be Pass1
 	ulogin1.Password = "Pass99"
@@ -67,12 +65,11 @@ func Test_Login_OnLockedAccount(t *testing.T) {
 
 	//first register the account to test
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_islockedout@here.com", Password: "Pass1"}
-	shdr, err := svb.Register(ctx, ulogin1, appName)
-
-	if err != nil {
-		t.Fatal(err)
+	result := svb.Register(ctx, ulogin1, appName)
+	if result.Check.Error != nil {
+		t.Fatal(result.Check.Error)
 	}
-	t.Logf("Register account: %s", shdr[sess.ConstJwtAccID].(string))
+	t.Logf("Register confirm token: %s", result.ConfirmToken)
 
 	//wrong password.. should be Pass1
 	ulogin1.Password = "Pass99"
@@ -105,12 +102,12 @@ func Test_Login_OnLockedAccount(t *testing.T) {
 		}
 	}
 
-	_, err = svb.Login(ctx, ulogin1, appName)
+	lgres := svb.Login(ctx, ulogin1, appName)
 
-	if err != nil {
-		if err != aucm.ErrAccountIsLocked {
-			t.Fatal(err)
-		} else if err == aucm.ErrAccountIsLocked {
+	if lgres.Check.Error != nil {
+		if lgres.Check.Error != aucm.ErrAccountIsLocked {
+			t.Fatal(lgres.Check.Error)
+		} else if lgres.Check.Error == aucm.ErrAccountIsLocked {
 			t.Log("login correctly failed because the account is locked")
 			return
 		}
@@ -129,15 +126,15 @@ func Test_Login_LockoutExpired(t *testing.T) {
 
 	ulogin1 := &aucm.UserAccountCandidate{Email: "test_islockedout@here.com", Password: "Pass1"}
 
-	shdr, err := svb.Login(ctx, ulogin1, appName)
+	lgres := svb.Login(ctx, ulogin1, appName)
 
-	if err != nil {
-		if err == aucm.ErrAccountIsLocked {
+	if lgres.Check.Error != nil {
+		if lgres.Check.Error == aucm.ErrAccountIsLocked {
 			t.Fatal("login incorrectly failed because the account is locked")
 		} else {
-			t.Fatal(err)
+			t.Fatal(lgres.Check.Error)
 		}
 	}
 
-	t.Logf("session header: %v", shdr)
+	t.Logf("login candidate id: %s", lgres.LoginID)
 }

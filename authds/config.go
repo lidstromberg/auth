@@ -45,8 +45,8 @@ func preflight(ctx context.Context, bc lbcf.ConfigSetting) {
 		log.Fatal("Could not parse environment variable EnvAuthDsAccountConfirmKind")
 	}
 
-	if bc.GetConfigValue(ctx, "EnvAuthDsSysDefaultKind") == "" {
-		log.Fatal("Could not parse environment variable EnvAuthDsSysDefaultKind")
+	if bc.GetConfigValue(ctx, "EnvAuthDsLoginKind") == "" {
+		log.Fatal("Could not parse environment variable EnvAuthDsLoginKind")
 	}
 
 	if bc.GetConfigValue(ctx, "EnvAuthGcpProject") == "" {
@@ -87,8 +87,8 @@ func preflightConfigLoader() map[string]string {
 	cfm["EnvAuthDsAccountNamespace"] = os.Getenv("LBAUTH_ACCNAMESP")
 	//EnvAuthDsAccountConfirmKind is the account confirmation token entity
 	cfm["EnvAuthDsAccountConfirmKind"] = os.Getenv("LBAUTH_KD_ACCCNF")
-	//EnvAuthDsSysDefaultKind is the defaults entity
-	cfm["EnvAuthDsSysDefaultKind"] = os.Getenv("LBAUTH_KD_SYSDEF")
+	//EnvAuthDsLoginKind is the login candidate entity
+	cfm["EnvAuthDsLoginKind"] = os.Getenv("LBAUTH_KD_LOGIN")
 	//EnvClientPool is the client poolsize
 	cfm["EnvClientPool"] = os.Getenv("LBAUTH_CLIPOOL")
 
@@ -104,8 +104,8 @@ func preflightConfigLoader() map[string]string {
 		log.Fatal("Could not parse environment variable EnvAuthDsAccountConfirmKind")
 	}
 
-	if cfm["EnvAuthDsSysDefaultKind"] == "" {
-		log.Fatal("Could not parse environment variable EnvAuthDsSysDefaultKind")
+	if cfm["EnvAuthDsLoginKind"] == "" {
+		log.Fatal("Could not parse environment variable EnvAuthDsLoginKind")
 	}
 
 	if cfm["EnvClientPool"] == "" {

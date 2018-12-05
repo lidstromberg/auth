@@ -321,20 +321,34 @@ func (credentialMgr *DsCredentialMgr) SaveAccount(ctx context.Context, userAccou
 	nowTime := time.Now()
 	userAccount.LastTouched = &nowTime
 
-	id, err := strconv.ParseInt(userAccount.UserAccountID, 10, 64)
-	if err != nil {
-		return "", err
-	}
+	var key *datastore.Key
 
-	accountKey := datastore.IDKey(credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountKind"), id, nil)
-	accountKey.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
+	if userAccount.UserAccountID == "" {
+		key1, err := utils.NewDsKey(ctx, credentialMgr.CmDsClient, credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace"), credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountKind"))
+		if err != nil {
+			return "", err
+		}
+
+		key = key1
+		userAccount.UserAccountID = strconv.FormatInt(key.ID, 10)
+	} else {
+		id, err := strconv.ParseInt(userAccount.UserAccountID, 10, 64)
+		if err != nil {
+			return "", err
+		}
+
+		key1 := datastore.IDKey(credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountKind"), id, nil)
+		key1.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
+
+		key = key1
+	}
 
 	tx, err := credentialMgr.CmDsClient.NewTransaction(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	if _, err := tx.Put(accountKey, userAccount); err != nil {
+	if _, err := tx.Put(key, userAccount); err != nil {
 		tx.Rollback()
 		return "", err
 	}

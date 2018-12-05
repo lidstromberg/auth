@@ -50,6 +50,13 @@ type IdentityAction interface {
 	FinishReset(ctx context.Context, userAccountToken, newpwd string) (*aucm.UserAccountConfirmationResult, error)
 	AccountExists(ctx context.Context, emailAddress string) (bool, error)
 	VerifyCredential(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) *aucm.PasswordCheckResult
+	VerifyOtp(ctx context.Context, otpCandidate *aucm.OtpCandidate) *aucm.OtpResult
+}
+
+//LoginCandidateAction defines actions which are performed as a tracked login
+type LoginCandidateAction interface {
+	SaveLoginCandidate(ctx context.Context, userID, email, roletoken string) (string, error)
+	ActivateLoginCandidate(ctx context.Context, loginID string) (map[string]interface{}, error)
 }
 
 //AuthCore defines the full set of operations performed by the authentication service
@@ -58,6 +65,7 @@ type AuthCore interface {
 	MailerAction
 	AuthenticatedAction
 	IdentityAction
+	LoginCandidateAction
 }
 
 //Core manages the issue log app operations
@@ -108,14 +116,10 @@ func (cr *Core) CreateAccountFromCandidate(ctx context.Context, userAccountCandi
 
 	currentTime := time.Now()
 	zeroTime := time.Time{}
-	accID, err := cr.Dm.NewAccountID(ctx)
-	if err != nil {
-		return nil, err
-	}
 
 	if pwdHash, err := utils.GetStringHash(userAccountCandidate.Password); err == nil {
 		userAccount = &aucm.UserAccount{
-			UserAccountID:        accID,
+			UserAccountID:        "",
 			Email:                userAccountCandidate.Email,
 			PasswordHash:         pwdHash,
 			EmailConfirmed:       false,
@@ -286,8 +290,7 @@ func (cr *Core) Login(ctx context.Context, userAccountCandidate *aucm.UserAccoun
 	}
 
 	//setup the return value
-	hdr := make(map[string]interface{})
-	lcr := &aucm.LoginCheckResult{Header: hdr}
+	lcr := &aucm.LoginCheckResult{}
 
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(userAccountCandidate.Email) {
@@ -1157,7 +1160,7 @@ func (cr *Core) ActivateLoginCandidate(ctx context.Context, loginID string) (map
 	}
 
 	//collect the map elements
-	shdr[sess.ConstJwtID] = lc.SessionID
+	shdr[sess.ConstJwtID] = lc.LoginID
 	shdr[sess.ConstJwtRole] = lc.RoleToken
 	shdr[sess.ConstJwtAccID] = lc.UserAccountID
 	shdr[sess.ConstJwtEml] = lc.Email
