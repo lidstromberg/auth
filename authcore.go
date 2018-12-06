@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	authds "github.com/lidstromberg/auth/authds"
 	otp "github.com/lidstromberg/auth/otp"
 	lbcf "github.com/lidstromberg/config"
 	utils "github.com/lidstromberg/utils"
@@ -83,7 +82,7 @@ func NewCoreCredentialMgr(ctx context.Context, bc lbcf.ConfigSetting, kpr *kp.Ke
 		lblog.LogEvent("Core", "NewCoreCredentialMgr", "info", "start")
 	}
 
-	dm, err := authds.NewDsCredentialMgr(ctx, bc)
+	dm, err := NewDsCredentialMgr(ctx, bc)
 	if err != nil {
 		return nil, err
 	}

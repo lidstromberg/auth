@@ -15,7 +15,7 @@ func preflightDs(ctx context.Context, bc lbcf.ConfigSetting) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.LUTC)
 	log.Println("Started AuthDs preflight..")
 
-	cfm1 := preflightConfigLoader()
+	cfm1 := preflightConfigLoaderDs()
 	bc.LoadConfigMap(ctx, cfm1)
 
 	if bc.GetConfigValue(ctx, "EnvDebugOn") == "" {
