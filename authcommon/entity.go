@@ -51,8 +51,9 @@ type PasswordCheckResult struct {
 
 //RegisterCheckResult represents a set of return values from a register attempt
 type RegisterCheckResult struct {
-	Check        *CheckResult `json:"check"`
-	ConfirmToken string       `json:"confirmtoken"`
+	Check         *CheckResult `json:"check"`
+	UserAccountID string       `json:"useraccountid"`
+	ConfirmToken  string       `json:"confirmtoken"`
 }
 
 //OtpResult returns the otp result
