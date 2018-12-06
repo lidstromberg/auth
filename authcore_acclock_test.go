@@ -3,7 +3,6 @@ package auth
 import (
 	"testing"
 
-	aucm "github.com/lidstromberg/auth/authcommon"
 	utils "github.com/lidstromberg/utils"
 	"golang.org/x/net/context"
 )
@@ -17,7 +16,7 @@ func Test_VerifyCredential_CauseLockout(t *testing.T) {
 	}
 
 	//first register the account to test
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_causelockout@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_causelockout@here.com", Password: "Pass1"}
 	result := svb.Register(ctx, ulogin1, appName)
 	if result.Check.Error != nil {
 		t.Fatal(result.Check.Error)
@@ -36,7 +35,7 @@ func Test_VerifyCredential_CauseLockout(t *testing.T) {
 			//the credentials are bad, so we should always hit this outcome until the account locks
 			if check.Check.Error == utils.ErrCredentialsNotCorrect {
 				t.Logf("Bad password correctly rejected: %d", localI)
-			} else if check.Check.Error == aucm.ErrAccountIsLocked {
+			} else if check.Check.Error == ErrAccountIsLocked {
 				//if the account is locked, check that this message occurred on the 4th attempt
 				//because the user should have three attempts to get the password right
 				if localI != 4 {
@@ -64,7 +63,7 @@ func Test_Login_OnLockedAccount(t *testing.T) {
 	}
 
 	//first register the account to test
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_islockedout@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_islockedout@here.com", Password: "Pass1"}
 	result := svb.Register(ctx, ulogin1, appName)
 	if result.Check.Error != nil {
 		t.Fatal(result.Check.Error)
@@ -83,7 +82,7 @@ func Test_Login_OnLockedAccount(t *testing.T) {
 			//the credentials are bad, so we should always hit this outcome until the account locks
 			if check.Check.Error == utils.ErrCredentialsNotCorrect {
 				t.Logf("Bad password correctly rejected: %d", localI)
-			} else if check.Check.Error == aucm.ErrAccountIsLocked {
+			} else if check.Check.Error == ErrAccountIsLocked {
 				//if the account is locked, check that this message occurred on the 4th attempt
 				//because the user should have three attempts to get the password right
 				if localI != 4 {
@@ -105,9 +104,9 @@ func Test_Login_OnLockedAccount(t *testing.T) {
 	lgres := svb.Login(ctx, ulogin1, appName)
 
 	if lgres.Check.Error != nil {
-		if lgres.Check.Error != aucm.ErrAccountIsLocked {
+		if lgres.Check.Error != ErrAccountIsLocked {
 			t.Fatal(lgres.Check.Error)
-		} else if lgres.Check.Error == aucm.ErrAccountIsLocked {
+		} else if lgres.Check.Error == ErrAccountIsLocked {
 			t.Log("login correctly failed because the account is locked")
 			return
 		}
@@ -124,12 +123,12 @@ func Test_Login_LockoutExpired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_islockedout@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_islockedout@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 
 	if lgres.Check.Error != nil {
-		if lgres.Check.Error == aucm.ErrAccountIsLocked {
+		if lgres.Check.Error == ErrAccountIsLocked {
 			t.Fatal("login incorrectly failed because the account is locked")
 		} else {
 			t.Fatal(lgres.Check.Error)

@@ -4,7 +4,7 @@ import (
 	"log"
 	"testing"
 
-	aucm "github.com/lidstromberg/auth/authcommon"
+	auth "github.com/lidstromberg/auth"
 	lbcf "github.com/lidstromberg/config"
 	stor "github.com/lidstromberg/storage"
 
@@ -17,7 +17,7 @@ func Test_DataRepoConnect(t *testing.T) {
 	bc := lbcf.NewConfig(ctx)
 
 	//run preflight checks
-	cfm1 := aucm.PreflightConfigLoader()
+	cfm1 := auth.PreflightConfigLoader()
 	bc.LoadConfigMap(ctx, cfm1)
 
 	//create a storage manager
@@ -28,7 +28,7 @@ func Test_DataRepoConnect(t *testing.T) {
 	}
 
 	//load the mailer config
-	cfm2, err := aucm.LoadMailerConfig(ctx, sm, bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
+	cfm2, err := auth.LoadMailerConfig(ctx, sm, bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
 
 	if err != nil {
 		t.Log(err)

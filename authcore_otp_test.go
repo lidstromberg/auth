@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"testing"
 
-	aucm "github.com/lidstromberg/auth/authcommon"
 	sess "github.com/lidstromberg/session"
 	"golang.org/x/net/context"
 )
@@ -18,7 +17,7 @@ func Test_SaveTwoFactor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -93,7 +92,7 @@ func Test_ValidateTwoFactor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -105,7 +104,7 @@ func Test_ValidateTwoFactor(t *testing.T) {
 	}
 
 	//replace this code with the number from your authenticator app
-	ulogin2 := &aucm.OtpCandidate{LoginID: lgres.LoginID, Otp: "212462"}
+	ulogin2 := &OtpCandidate{LoginID: lgres.LoginID, Otp: "212462"}
 
 	otr := svb.VerifyOtp(ctx, ulogin2)
 	if otr.Check.Error != nil {

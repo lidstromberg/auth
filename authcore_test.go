@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	aucm "github.com/lidstromberg/auth/authcommon"
 	lbcf "github.com/lidstromberg/config"
 	kp "github.com/lidstromberg/keypair"
 	sess "github.com/lidstromberg/session"
@@ -23,7 +22,7 @@ func createNewCore(ctx context.Context) (AuthCore, error) {
 	bc := lbcf.NewConfig(ctx)
 
 	//load the config
-	cfm1 := aucm.PreflightConfigLoader()
+	cfm1 := PreflightConfigLoader()
 	bc.LoadConfigMap(ctx, cfm1)
 
 	//create a storage manager
@@ -34,7 +33,7 @@ func createNewCore(ctx context.Context) (AuthCore, error) {
 	}
 
 	//load the mailer config
-	cfm2, err := aucm.LoadMailerConfig(ctx, sm, bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
+	cfm2, err := LoadMailerConfig(ctx, sm, bc.GetConfigValue(ctx, "EnvAuthGcpBucket"), bc.GetConfigValue(ctx, "EnvMailerFile"))
 
 	if err != nil {
 		log.Fatal(err)
@@ -72,7 +71,7 @@ func Test_AccountExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uacc1 := &aucm.UserAccountCandidate{Email: "test_accountexists@here.com"}
+	uacc1 := &UserAccountCandidate{Email: "test_accountexists@here.com"}
 
 	result, err := cr1.AccountExists(ctx, uacc1.Email)
 
@@ -94,7 +93,7 @@ func Test_Register(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uacc2 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	uacc2 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	result := svb.Register(ctx, uacc2, appName)
 	if result.Check.Error != nil {
@@ -102,6 +101,7 @@ func Test_Register(t *testing.T) {
 	}
 
 	t.Logf("Register confirm token: %s", result.ConfirmToken)
+	t.Logf("Register accountid: %s", result.UserAccountID)
 }
 func Test_Login(t *testing.T) {
 	ctx := context.Background()
@@ -111,7 +111,7 @@ func Test_Login(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -137,7 +137,7 @@ func Test_GetLoginProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -173,7 +173,7 @@ func Test_SaveAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -236,7 +236,7 @@ func Test_RequestReset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	conftoken, err := svb.RequestReset(ctx, ulogin1.Email, appName)
 	if err != nil {
@@ -253,7 +253,7 @@ func Test_StartAccountConfirmation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -288,7 +288,7 @@ func Test_FinishAccountConfirmation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -334,10 +334,10 @@ func Test_HasAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uacc2 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	uacc2 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	result, err := svb.HasAccess(ctx, uacc2.Email, "noaccesstoapp")
-	if err != nil && err != aucm.ErrAppRoleAccessDenied {
+	if err != nil && err != ErrAppRoleAccessDenied {
 		t.Fatal(err)
 	}
 
@@ -353,7 +353,7 @@ func Test_GetAccountRoleToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -386,7 +386,7 @@ func Test_GetAccountRole(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -425,7 +425,7 @@ func Test_VerifyCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	check := svb.VerifyCredential(ctx, ulogin1)
 	if check.Check.Error != nil {
@@ -461,7 +461,7 @@ func Test_SaveEmailConfirmation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -491,7 +491,7 @@ func Test_SaveEmailConfirmation(t *testing.T) {
 	currentTime := time.Now()
 	expiryDate := time.Now().Add(24 * time.Hour)
 
-	uac1 := aucm.UserAccountConfirmation{
+	uac1 := UserAccountConfirmation{
 		ConfirmToken:                conftoken,
 		Email:                       shdr1[sess.ConstJwtEml].(string),
 		UserAccountID:               shdr1[sess.ConstJwtAccID].(string),
@@ -522,7 +522,7 @@ func Test_SendMail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -538,12 +538,12 @@ func Test_SendMail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uec := &aucm.UserEmailConfirm{
+	uec := &UserEmailConfirm{
 		Email:                       shdr1[sess.ConstJwtEml].(string),
 		ConfirmToken:                utils.NewID(),
 		ConfirmURL:                  "EnvAuthMailAccountConfirmationURL",
 		EmailSender:                 "test_reglog@here.com",
-		UserAccountConfirmationType: aucm.Registration.String(),
+		UserAccountConfirmationType: Registration.String(),
 	}
 
 	result, err := svb.SendMail(ctx, uec, appName, false)
@@ -565,7 +565,7 @@ func Test_SaveAccountApp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ulogin1 := &aucm.UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
+	ulogin1 := &UserAccountCandidate{Email: "test_reglog@here.com", Password: "Pass1"}
 
 	lgres := svb.Login(ctx, ulogin1, appName)
 	if lgres.Check.Error != nil {
@@ -588,7 +588,7 @@ func Test_SaveAccountApp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newUaccApp := &aucm.UserAccountApplication{}
+	newUaccApp := &UserAccountApplication{}
 	newUaccApp.ApplicationName = "addedapp"
 	newUaccApp.CreatedDate = &currentTime
 	newUaccApp.IsActive = true
@@ -626,7 +626,6 @@ func Test_SaveAccountApp(t *testing.T) {
 
 	t.Logf("userid: %s", userid)
 }
-
 func Test_SaveLoginCandidate(t *testing.T) {
 	ctx := context.Background()
 
@@ -642,7 +641,6 @@ func Test_SaveLoginCandidate(t *testing.T) {
 
 	t.Logf("LoginID : %s", lgid)
 }
-
 func Test_ActivateLoginCandidate(t *testing.T) {
 	ctx := context.Background()
 

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	aucm "github.com/lidstromberg/auth/authcommon"
 	authds "github.com/lidstromberg/auth/authds"
 	otp "github.com/lidstromberg/auth/otp"
 	lbcf "github.com/lidstromberg/config"
@@ -26,31 +25,31 @@ import (
 //MailerAction defines actions which are called as part of an email based workflow
 type MailerAction interface {
 	StartAccountConfirmation(ctx context.Context, userID, email, appName string, liveCall bool) (string, error)
-	FinishAccountConfirmation(ctx context.Context, userAccountToken string) (*aucm.UserAccountConfirmationResult, error)
-	SaveEmailConfirmation(ctx context.Context, userAccountConf *aucm.UserAccountConfirmation) (*aucm.UserAccountConfirmationResult, error)
-	SendMail(ctx context.Context, emailConfirm *aucm.UserEmailConfirm, appName string, liveCall bool) (bool, error)
+	FinishAccountConfirmation(ctx context.Context, userAccountToken string) (*UserAccountConfirmationResult, error)
+	SaveEmailConfirmation(ctx context.Context, userAccountConf *UserAccountConfirmation) (*UserAccountConfirmationResult, error)
+	SendMail(ctx context.Context, emailConfirm *UserEmailConfirm, appName string, liveCall bool) (bool, error)
 }
 
 //AuthenticatedAction defines actions which require a user to be previously authenticated
 type AuthenticatedAction interface {
-	GetLoginProfile(ctx context.Context, userID string, withSecure bool) (*aucm.UserAccount, error)
-	ToggleTwoFactor(ctx context.Context, domain, userID string, period int32, toggle, qr bool) *aucm.ToggleOtpResult
-	SaveAccount(ctx context.Context, userAccount *aucm.UserAccount) (string, error)
+	GetLoginProfile(ctx context.Context, userID string, withSecure bool) (*UserAccount, error)
+	ToggleTwoFactor(ctx context.Context, domain, userID string, period int32, toggle, qr bool) *ToggleOtpResult
+	SaveAccount(ctx context.Context, userAccount *UserAccount) (string, error)
 	SavePassword(ctx context.Context, userID, newpwd string) (bool, error)
 	HasAccess(ctx context.Context, emailAddress, appName string) (bool, error)
 	GetAccountRoleToken(ctx context.Context, userID string) (string, error)
-	GetAccountRole(ctx context.Context, userID string) ([]*aucm.UserAccountApplication, error)
+	GetAccountRole(ctx context.Context, userID string) ([]*UserAccountApplication, error)
 }
 
 //IdentityAction defines actions which are performed in order to identify/authenticate a user
 type IdentityAction interface {
-	Register(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) *aucm.RegisterCheckResult
-	Login(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) *aucm.LoginCheckResult
+	Register(ctx context.Context, userAccountCandidate *UserAccountCandidate, appName string) *RegisterCheckResult
+	Login(ctx context.Context, userAccountCandidate *UserAccountCandidate, appName string) *LoginCheckResult
 	RequestReset(ctx context.Context, emailAddress, appName string) (string, error)
-	FinishReset(ctx context.Context, userAccountToken, newpwd string) (*aucm.UserAccountConfirmationResult, error)
+	FinishReset(ctx context.Context, userAccountToken, newpwd string) (*UserAccountConfirmationResult, error)
 	AccountExists(ctx context.Context, emailAddress string) (bool, error)
-	VerifyCredential(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) *aucm.PasswordCheckResult
-	VerifyOtp(ctx context.Context, otpCandidate *aucm.OtpCandidate) *aucm.OtpResult
+	VerifyCredential(ctx context.Context, userAccountCandidate *UserAccountCandidate) *PasswordCheckResult
+	VerifyOtp(ctx context.Context, otpCandidate *OtpCandidate) *OtpResult
 }
 
 //LoginCandidateAction defines actions which are performed as a tracked login
@@ -61,7 +60,7 @@ type LoginCandidateAction interface {
 
 //AuthCore defines the full set of operations performed by the authentication service
 type AuthCore interface {
-	CreateAccountFromCandidate(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) (*aucm.UserAccount, error)
+	CreateAccountFromCandidate(ctx context.Context, userAccountCandidate *UserAccountCandidate) (*UserAccount, error)
 	MailerAction
 	AuthenticatedAction
 	IdentityAction
@@ -70,7 +69,7 @@ type AuthCore interface {
 
 //Core manages the issue log app operations
 type Core struct {
-	Dm aucm.CredentialDataMgr
+	Dm CredentialDataMgr
 	Mc *sendgrid.Client
 	Kp *kp.KeyPair
 	Bc lbcf.ConfigSetting
@@ -104,21 +103,21 @@ func NewCoreCredentialMgr(ctx context.Context, bc lbcf.ConfigSetting, kpr *kp.Ke
 }
 
 //CreateAccountFromCandidate converts a candidate to a useraccount with hashed password
-func (cr *Core) CreateAccountFromCandidate(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) (*aucm.UserAccount, error) {
+func (cr *Core) CreateAccountFromCandidate(ctx context.Context, userAccountCandidate *UserAccountCandidate) (*UserAccount, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "CreateAccountFromCandidate", "info", "start")
 	}
 
 	var (
-		userAccount *aucm.UserAccount
-		userApps    []*aucm.UserAccountApplication
+		userAccount *UserAccount
+		userApps    []*UserAccountApplication
 	)
 
 	currentTime := time.Now()
 	zeroTime := time.Time{}
 
 	if pwdHash, err := utils.GetStringHash(userAccountCandidate.Password); err == nil {
-		userAccount = &aucm.UserAccount{
+		userAccount = &UserAccount{
 			UserAccountID:        "",
 			Email:                userAccountCandidate.Email,
 			PasswordHash:         pwdHash,
@@ -170,16 +169,16 @@ func (cr *Core) AccountExists(ctx context.Context, emailAddress string) (bool, e
 }
 
 //Register registers an account for the current application
-func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) *aucm.RegisterCheckResult {
+func (cr *Core) Register(ctx context.Context, userAccountCandidate *UserAccountCandidate, appName string) *RegisterCheckResult {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "Register", "info", "start")
 	}
 
-	rcr := &aucm.RegisterCheckResult{Check: &aucm.CheckResult{}}
+	rcr := &RegisterCheckResult{Check: &CheckResult{}}
 
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(userAccountCandidate.Email) {
-		rcr.Check.Error = aucm.ErrEmailInvalid
+		rcr.Check.Error = ErrEmailInvalid
 		rcr.Check.CheckResult = false
 
 		return rcr
@@ -195,7 +194,7 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAcc
 	}
 
 	if accExist {
-		rcr.Check.Error = aucm.ErrAccountIsRegistered
+		rcr.Check.Error = ErrAccountIsRegistered
 		rcr.Check.CheckResult = false
 
 		return rcr
@@ -214,7 +213,7 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAcc
 	currentTime := time.Now()
 	zeroTime := time.Time{}
 
-	uaccApp := &aucm.UserAccountApplication{}
+	uaccApp := &UserAccountApplication{}
 	uaccApp.ApplicationName = appName
 	uaccApp.IsActive = true
 	uaccApp.CreatedDate = &currentTime
@@ -232,7 +231,7 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAcc
 	}
 
 	//start the mail confirmation
-	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid, userAccountCandidate.Email, aucm.Registration.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
+	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid, userAccountCandidate.Email, Registration.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
 	if err != nil {
 		rcr.Check.Error = err
 		rcr.Check.CheckResult = false
@@ -249,7 +248,7 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAcc
 	}
 
 	if emconf == nil {
-		rcr.Check.Error = aucm.ErrAccountRegNotCompleted
+		rcr.Check.Error = ErrAccountRegNotCompleted
 		rcr.Check.CheckResult = false
 
 		return rcr
@@ -264,7 +263,7 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAcc
 	}
 
 	if !result {
-		rcr.Check.Error = aucm.ErrMailConfirmNotCompleted
+		rcr.Check.Error = ErrMailConfirmNotCompleted
 		rcr.Check.CheckResult = false
 
 		return rcr
@@ -273,7 +272,7 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAcc
 	//set the remaining values
 	rcr.Check.CheckResult = true
 	rcr.Check.CheckMessage = "success"
-	rcr.Check.Error = nil
+	rcr.UserAccountID = userid
 	rcr.ConfirmToken = emconf.ConfirmToken
 
 	if EnvDebugOn {
@@ -284,17 +283,17 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *aucm.UserAcc
 }
 
 //Login logs in an existing user
-func (cr *Core) Login(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate, appName string) *aucm.LoginCheckResult {
+func (cr *Core) Login(ctx context.Context, userAccountCandidate *UserAccountCandidate, appName string) *LoginCheckResult {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "Login", "info", "start")
 	}
 
 	//setup the return value
-	lcr := &aucm.LoginCheckResult{Check: &aucm.CheckResult{}}
+	lcr := &LoginCheckResult{Check: &CheckResult{}}
 
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(userAccountCandidate.Email) {
-		lcr.Check.Error = aucm.ErrEmailInvalid
+		lcr.Check.Error = ErrEmailInvalid
 		lcr.Check.CheckResult = false
 
 		return lcr
@@ -310,7 +309,7 @@ func (cr *Core) Login(ctx context.Context, userAccountCandidate *aucm.UserAccoun
 	}
 
 	if !accExist {
-		lcr.Check.Error = aucm.ErrAccountNotExist
+		lcr.Check.Error = ErrAccountNotExist
 		lcr.Check.CheckResult = false
 
 		return lcr
@@ -365,7 +364,7 @@ func (cr *Core) Login(ctx context.Context, userAccountCandidate *aucm.UserAccoun
 }
 
 //GetLoginProfile returns the user account profile
-func (cr *Core) GetLoginProfile(ctx context.Context, userID string, withSecure bool) (*aucm.UserAccount, error) {
+func (cr *Core) GetLoginProfile(ctx context.Context, userID string, withSecure bool) (*UserAccount, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "GetLoginProfile", "info", "start")
 	}
@@ -387,13 +386,13 @@ func (cr *Core) GetLoginProfile(ctx context.Context, userID string, withSecure b
 }
 
 //ToggleTwoFactor switches two factor authentication on/off
-func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, period int32, toggle, qr bool) *aucm.ToggleOtpResult {
+func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, period int32, toggle, qr bool) *ToggleOtpResult {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "ToggleTwoFactor", "info", "start")
 	}
 
-	chkr := &aucm.CheckResult{}
-	otpr := &aucm.ToggleOtpResult{Check: chkr}
+	chkr := &CheckResult{}
+	otpr := &ToggleOtpResult{Check: chkr}
 
 	//get the profile
 	uacc, err := cr.Dm.GetLoginProfile(ctx, userID)
@@ -470,7 +469,7 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 }
 
 //SaveAccount saves a user account back to the store
-func (cr *Core) SaveAccount(ctx context.Context, userAccount *aucm.UserAccount) (string, error) {
+func (cr *Core) SaveAccount(ctx context.Context, userAccount *UserAccount) (string, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "SaveAccount", "info", "start")
 	}
@@ -528,7 +527,7 @@ func (cr *Core) SavePassword(ctx context.Context, userID, newpwd string) (bool, 
 	}
 
 	if uaccid == "" {
-		return false, aucm.ErrFailedToSave
+		return false, ErrFailedToSave
 	}
 
 	if EnvDebugOn {
@@ -545,7 +544,7 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(emailAddress) {
-		return "", aucm.ErrEmailInvalid
+		return "", ErrEmailInvalid
 	}
 
 	userid, err := cr.Dm.GetLoginProfileByEmail(ctx, emailAddress)
@@ -554,10 +553,10 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 	}
 
 	if userid.UserAccountID == "" {
-		return "", aucm.ErrAccountNotExist
+		return "", ErrAccountNotExist
 	}
 
-	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid.UserAccountID, emailAddress, aucm.CredentialReset.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
+	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid.UserAccountID, emailAddress, CredentialReset.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
 	if err != nil {
 		return "", err
 	}
@@ -571,7 +570,7 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 	}
 
 	if emconf == nil {
-		return "", aucm.ErrAccountRegNotCompleted
+		return "", ErrAccountRegNotCompleted
 	}
 
 	result, err := cr.SendMail(ctx, emconf, appName, true)
@@ -580,7 +579,7 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 	}
 
 	if !result {
-		return "", aucm.ErrMailConfirmNotCompleted
+		return "", ErrMailConfirmNotCompleted
 	}
 
 	if EnvDebugOn {
@@ -590,7 +589,7 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 }
 
 //FinishReset completes a two-part account reset process
-func (cr *Core) FinishReset(ctx context.Context, userAccountToken, newpwd string) (*aucm.UserAccountConfirmationResult, error) {
+func (cr *Core) FinishReset(ctx context.Context, userAccountToken, newpwd string) (*UserAccountConfirmationResult, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "FinishReset", "info", "start")
 	}
@@ -601,7 +600,7 @@ func (cr *Core) FinishReset(ctx context.Context, userAccountToken, newpwd string
 	}
 
 	if accconf.TokenUsed || accconf.ExpiryDate.Before(time.Now()) {
-		return nil, aucm.ErrConfirmTokenInvalid
+		return nil, ErrConfirmTokenInvalid
 	}
 
 	currentTime := time.Now()
@@ -616,7 +615,7 @@ func (cr *Core) FinishReset(ctx context.Context, userAccountToken, newpwd string
 	}
 
 	if !confres.Result {
-		return nil, aucm.ErrConfirmTokenInvalid
+		return nil, ErrConfirmTokenInvalid
 	}
 
 	//mark the email confirmed flag on the account
@@ -646,7 +645,7 @@ func (cr *Core) StartAccountConfirmation(ctx context.Context, userID, email, app
 
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(email) {
-		return "", aucm.ErrEmailInvalid
+		return "", ErrEmailInvalid
 	}
 
 	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userID, email, "registration", cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
@@ -655,7 +654,7 @@ func (cr *Core) StartAccountConfirmation(ctx context.Context, userID, email, app
 	}
 
 	if emconf == nil {
-		return "", aucm.ErrAccountRegNotCompleted
+		return "", ErrAccountRegNotCompleted
 	}
 
 	if EnvDebugOn {
@@ -672,7 +671,7 @@ func (cr *Core) StartAccountConfirmation(ctx context.Context, userID, email, app
 	}
 
 	if !result {
-		return "", aucm.ErrMailConfirmNotCompleted
+		return "", ErrMailConfirmNotCompleted
 	}
 
 	if EnvDebugOn {
@@ -682,7 +681,7 @@ func (cr *Core) StartAccountConfirmation(ctx context.Context, userID, email, app
 }
 
 //FinishAccountConfirmation completes a two-part confirmation process (such as registration or credential reset)
-func (cr *Core) FinishAccountConfirmation(ctx context.Context, userAccountToken string) (*aucm.UserAccountConfirmationResult, error) {
+func (cr *Core) FinishAccountConfirmation(ctx context.Context, userAccountToken string) (*UserAccountConfirmationResult, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "FinishAccountConfirmation", "info", "start")
 	}
@@ -693,7 +692,7 @@ func (cr *Core) FinishAccountConfirmation(ctx context.Context, userAccountToken 
 	}
 
 	if accconf.TokenUsed || accconf.ExpiryDate.Before(time.Now()) {
-		return nil, aucm.ErrConfirmTokenInvalid
+		return nil, ErrConfirmTokenInvalid
 	}
 
 	currentTime := time.Now()
@@ -708,7 +707,7 @@ func (cr *Core) FinishAccountConfirmation(ctx context.Context, userAccountToken 
 	}
 
 	if !confres.Result {
-		return nil, aucm.ErrConfirmTokenInvalid
+		return nil, ErrConfirmTokenInvalid
 	}
 
 	//mark the email confirmed flag on the account
@@ -732,7 +731,7 @@ func (cr *Core) HasAccess(ctx context.Context, emailAddress, appName string) (bo
 
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(emailAddress) {
-		return false, aucm.ErrEmailInvalid
+		return false, ErrEmailInvalid
 	}
 
 	//get the profile
@@ -790,7 +789,7 @@ func (cr *Core) GetAccountRoleToken(ctx context.Context, userID string) (string,
 }
 
 //GetAccountRole returns an array of apps which the user account has access to
-func (cr *Core) GetAccountRole(ctx context.Context, userID string) ([]*aucm.UserAccountApplication, error) {
+func (cr *Core) GetAccountRole(ctx context.Context, userID string) ([]*UserAccountApplication, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "GetAccountRole", "info", "start")
 	}
@@ -810,16 +809,16 @@ func (cr *Core) GetAccountRole(ctx context.Context, userID string) ([]*aucm.User
 }
 
 //VerifyCredential checks that an email/password combination is valid
-func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm.UserAccountCandidate) *aucm.PasswordCheckResult {
+func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *UserAccountCandidate) *PasswordCheckResult {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "VerifyCredential", "info", "start")
 	}
 
-	apr := &aucm.PasswordCheckResult{Check: &aucm.CheckResult{}}
+	apr := &PasswordCheckResult{Check: &CheckResult{}}
 
 	//reject if this is an invalid email
 	if !utils.EmailIsValid(userAccountCandidate.Email) {
-		apr.Check.Error = aucm.ErrEmailInvalid
+		apr.Check.Error = ErrEmailInvalid
 		apr.Check.CheckResult = false
 
 		return apr
@@ -836,7 +835,7 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 
 	//if the count is zero then return
 	if ctd == 0 {
-		apr.Check.Error = aucm.ErrAccountNotLocated
+		apr.Check.Error = ErrAccountNotLocated
 		apr.Check.CheckResult = false
 
 		return apr
@@ -856,7 +855,7 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 
 	//if the account is locked then return the error
 	if candidate.LockoutEnd.After(currentTime) {
-		apr.Check.Error = aucm.ErrAccountIsLocked
+		apr.Check.Error = ErrAccountIsLocked
 		apr.Check.CheckResult = false
 
 		return apr
@@ -914,17 +913,17 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *aucm
 }
 
 //VerifyOtp checks
-func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *aucm.OtpCandidate) *aucm.OtpResult {
+func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *OtpCandidate) *OtpResult {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "VerifyOtp", "info", "start")
 		lblog.LogEvent("Core", "VerifyOtp", "2FAOTP", otpCandidate.Otp)
 	}
 
-	lor := &aucm.OtpResult{Check: &aucm.CheckResult{}}
+	lor := &OtpResult{Check: &CheckResult{}}
 
 	if otpCandidate.Otp == "" {
 		lor.Check.CheckResult = false
-		lor.Check.Error = aucm.ErrOtpNotExist
+		lor.Check.Error = ErrOtpNotExist
 
 		return lor
 	}
@@ -973,22 +972,22 @@ func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *aucm.OtpCandidate) 
 }
 
 //SaveEmailConfirmation sets the account record to indicate email confirmation
-func (cr *Core) SaveEmailConfirmation(ctx context.Context, userAccountConf *aucm.UserAccountConfirmation) (*aucm.UserAccountConfirmationResult, error) {
+func (cr *Core) SaveEmailConfirmation(ctx context.Context, userAccountConf *UserAccountConfirmation) (*UserAccountConfirmationResult, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "SaveEmailConfirmation", "info", "start")
 	}
 
-	res := &aucm.UserAccountConfirmationResult{Result: false}
+	res := &UserAccountConfirmationResult{Result: false}
 	currentTime := time.Now()
 
-	if userAccountConf.UserAccountConfirmationType == aucm.Registration.String() {
+	if userAccountConf.UserAccountConfirmationType == Registration.String() {
 		uacc, err := cr.Dm.GetLoginProfile(ctx, userAccountConf.UserAccountID)
 		if err != nil {
 			return res, err
 		}
 
 		if uacc == nil {
-			return res, aucm.ErrAccountNotLocated
+			return res, ErrAccountNotLocated
 		}
 
 		if !uacc.EmailConfirmed {
@@ -1001,7 +1000,7 @@ func (cr *Core) SaveEmailConfirmation(ctx context.Context, userAccountConf *aucm
 			}
 
 			if uaccid == "" {
-				return res, aucm.ErrAccountCannotBeCreated
+				return res, ErrAccountCannotBeCreated
 			}
 		}
 	}
@@ -1017,7 +1016,7 @@ func (cr *Core) SaveEmailConfirmation(ctx context.Context, userAccountConf *aucm
 }
 
 //SendMail calls the mail client to send an email
-func (cr *Core) SendMail(ctx context.Context, emailConfirm *aucm.UserEmailConfirm, appName string, liveCall bool) (bool, error) {
+func (cr *Core) SendMail(ctx context.Context, emailConfirm *UserEmailConfirm, appName string, liveCall bool) (bool, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("Core", "SendMail", "info", "start")
 	}
@@ -1028,7 +1027,7 @@ func (cr *Core) SendMail(ctx context.Context, emailConfirm *aucm.UserEmailConfir
 			lblog.LogEvent("Core", "SendMail", "info", emailConfirm.EmailSender)
 			lblog.LogEvent("Core", "SendMail", "info", emailConfirm.Email)
 		}
-		return false, aucm.ErrEmailInvalid
+		return false, ErrEmailInvalid
 	}
 
 	var subject, plainTextContent, htmlContent string
@@ -1037,20 +1036,20 @@ func (cr *Core) SendMail(ctx context.Context, emailConfirm *aucm.UserEmailConfir
 	to := mail.NewEmail(emailConfirm.Email, emailConfirm.Email)
 
 	switch emailConfirm.UserAccountConfirmationType {
-	case aucm.Registration.String():
+	case Registration.String():
 		{
 			subject = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegSubject"), appName)
 			plainTextContent = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegPlainTxt"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
 			htmlContent = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegHTML"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
 		}
-	case aucm.CredentialReset.String():
+	case CredentialReset.String():
 		{
 			subject = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegSubject"), appName)
 			plainTextContent = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegPlainTxt"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
 			htmlContent = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegHTML"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
 		}
 	default:
-		return false, aucm.ErrMailConfirmNotCompleted
+		return false, ErrMailConfirmNotCompleted
 	}
 
 	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
@@ -1086,7 +1085,7 @@ func (cr *Core) SaveLoginCandidate(ctx context.Context, userID, email, roletoken
 	currentTime := time.Now()
 	activatedTime := &time.Time{}
 
-	lc := &aucm.LoginCandidate{
+	lc := &LoginCandidate{
 		UserAccountID: userID,
 		Email:         email,
 		RoleToken:     roletoken,
@@ -1120,7 +1119,7 @@ func (cr *Core) ActivateLoginCandidate(ctx context.Context, loginID string) (map
 	//check that the login candidate has not expired
 	cd := *lc.CreatedDate
 	if currentTime.Sub(cd) > (time.Minute * 5) {
-		return nil, aucm.ErrLcExpired
+		return nil, ErrLcExpired
 	}
 
 	//collect the map elements
