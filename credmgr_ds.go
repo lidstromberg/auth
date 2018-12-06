@@ -1,11 +1,10 @@
-package authds
+package auth
 
 import (
 	"fmt"
 	"strconv"
 	"time"
 
-	auth "github.com/lidstromberg/auth"
 	lbcf "github.com/lidstromberg/config"
 	lblog "github.com/lidstromberg/log"
 	utils "github.com/lidstromberg/utils"
@@ -24,7 +23,7 @@ type DsCredentialMgr struct {
 
 //NewDsCredentialMgr creates a new credential manager
 func NewDsCredentialMgr(ctx context.Context, bc lbcf.ConfigSetting) (*DsCredentialMgr, error) {
-	preflight(ctx, bc)
+	preflightDs(ctx, bc)
 
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "NewDsCredentialMgr", "info", "start")
@@ -48,7 +47,7 @@ func NewDsCredentialMgr(ctx context.Context, bc lbcf.ConfigSetting) (*DsCredenti
 }
 
 //GetAccountCredential gets an account credential based on an email address
-func (credentialMgr *DsCredentialMgr) GetAccountCredential(ctx context.Context, emailAddress string) (*auth.UserAccountCredential, error) {
+func (credentialMgr *DsCredentialMgr) GetAccountCredential(ctx context.Context, emailAddress string) (*UserAccountCredential, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "GetAccountCredential", "info", "start")
 	}
@@ -66,10 +65,10 @@ func (credentialMgr *DsCredentialMgr) GetAccountCredential(ctx context.Context, 
 	}
 
 	if candidate.UserAccountID == "" {
-		return nil, auth.ErrAccountNotLocated
+		return nil, ErrAccountNotLocated
 	}
 
-	ucred := &auth.UserAccountCredential{}
+	ucred := &UserAccountCredential{}
 	ucred.UserAccountID = candidate.UserAccountID
 	ucred.PasswordHash = candidate.PasswordHash
 	ucred.TwoFactorEnabled = candidate.TwoFactorEnabled
@@ -123,7 +122,7 @@ func (credentialMgr *DsCredentialMgr) SavedFailedLogin(ctx context.Context, emai
 		}
 
 		if accountIsLocked {
-			return auth.ErrAccountIsLocked
+			return ErrAccountIsLocked
 		}
 	}
 
@@ -146,7 +145,7 @@ func (credentialMgr *DsCredentialMgr) ResetFailedLogin(ctx context.Context, emai
 		Filter("email =", emailAddress).
 		Limit(1)
 
-	var candidate auth.UserAccount
+	var candidate UserAccount
 
 	it := credentialMgr.CmDsClient.Run(ctx, q)
 
@@ -219,7 +218,7 @@ func (credentialMgr *DsCredentialMgr) GetAccountCount(ctx context.Context, email
 }
 
 //GetLoginProfile gets an account based on a userid
-func (credentialMgr *DsCredentialMgr) GetLoginProfile(ctx context.Context, userID string) (*auth.UserAccount, error) {
+func (credentialMgr *DsCredentialMgr) GetLoginProfile(ctx context.Context, userID string) (*UserAccount, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "GetLoginProfile", "info", "start")
 	}
@@ -232,17 +231,17 @@ func (credentialMgr *DsCredentialMgr) GetLoginProfile(ctx context.Context, userI
 	accountKey := datastore.IDKey(credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountKind"), id, nil)
 	accountKey.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
 
-	var candidate auth.UserAccount
+	var candidate UserAccount
 
 	if err := credentialMgr.CmDsClient.Get(ctx, accountKey, &candidate); err != nil {
 		if err == datastore.ErrNoSuchEntity {
-			return nil, auth.ErrAccountNotLocated
+			return nil, ErrAccountNotLocated
 		}
 		return nil, err
 	}
 
 	if candidate.UserAccountID == "" {
-		return nil, auth.ErrAccountNotLocated
+		return nil, ErrAccountNotLocated
 	}
 
 	if EnvDebugOn {
@@ -253,7 +252,7 @@ func (credentialMgr *DsCredentialMgr) GetLoginProfile(ctx context.Context, userI
 }
 
 //GetLoginProfileByEmail gets an account based on an email address
-func (credentialMgr *DsCredentialMgr) GetLoginProfileByEmail(ctx context.Context, emailAddress string) (*auth.UserAccount, error) {
+func (credentialMgr *DsCredentialMgr) GetLoginProfileByEmail(ctx context.Context, emailAddress string) (*UserAccount, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "GetLoginProfileByEmail", "info", "start")
 	}
@@ -264,7 +263,7 @@ func (credentialMgr *DsCredentialMgr) GetLoginProfileByEmail(ctx context.Context
 		Filter("email =", emailAddress).
 		Limit(1)
 
-	var candidate auth.UserAccount
+	var candidate UserAccount
 
 	it := credentialMgr.CmDsClient.Run(ctx, q)
 
@@ -282,7 +281,7 @@ func (credentialMgr *DsCredentialMgr) GetLoginProfileByEmail(ctx context.Context
 	}
 
 	if candidate.UserAccountID == "" {
-		return nil, auth.ErrAccountNotLocated
+		return nil, ErrAccountNotLocated
 	}
 
 	if EnvDebugOn {
@@ -293,7 +292,7 @@ func (credentialMgr *DsCredentialMgr) GetLoginProfileByEmail(ctx context.Context
 }
 
 //GetAccountApp returns an array of applications for a given account
-func (credentialMgr *DsCredentialMgr) GetAccountApp(ctx context.Context, userID string) ([]*auth.UserAccountApplication, error) {
+func (credentialMgr *DsCredentialMgr) GetAccountApp(ctx context.Context, userID string) ([]*UserAccountApplication, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "GetAccountApp", "info", "start")
 	}
@@ -312,7 +311,7 @@ func (credentialMgr *DsCredentialMgr) GetAccountApp(ctx context.Context, userID 
 }
 
 //SaveAccount saves data back to datastore
-func (credentialMgr *DsCredentialMgr) SaveAccount(ctx context.Context, userAccount *auth.UserAccount) (string, error) {
+func (credentialMgr *DsCredentialMgr) SaveAccount(ctx context.Context, userAccount *UserAccount) (string, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "SaveAccount", "info", "start")
 	}
@@ -364,14 +363,14 @@ func (credentialMgr *DsCredentialMgr) SaveAccount(ctx context.Context, userAccou
 }
 
 //StartAccountConfirmation generates a token for the user confirmation email
-func (credentialMgr *DsCredentialMgr) StartAccountConfirmation(ctx context.Context, userID, emailAddress, userAccountConfirmationType, url, urlrd, sender, sendername string) (*auth.UserEmailConfirm, error) {
+func (credentialMgr *DsCredentialMgr) StartAccountConfirmation(ctx context.Context, userID, emailAddress, userAccountConfirmationType, url, urlrd, sender, sendername string) (*UserEmailConfirm, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "StartAccountConfirmation", "info", "start")
 	}
 
 	var (
-		returnConf auth.UserEmailConfirm
-		accToken   auth.UserAccountConfirmation
+		returnConf UserEmailConfirm
+		accToken   UserAccountConfirmation
 	)
 	currentTime := time.Now()
 	expiryTime := currentTime.Add(time.Hour * 24)
@@ -419,7 +418,7 @@ func (credentialMgr *DsCredentialMgr) StartAccountConfirmation(ctx context.Conte
 }
 
 //GetAccountConfirmation returns the account confirmation object associated with the userAccountToken
-func (credentialMgr *DsCredentialMgr) GetAccountConfirmation(ctx context.Context, userAccountToken string) (*auth.UserAccountConfirmation, error) {
+func (credentialMgr *DsCredentialMgr) GetAccountConfirmation(ctx context.Context, userAccountToken string) (*UserAccountConfirmation, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "GetAccountConfirmation", "info", "start")
 	}
@@ -432,12 +431,12 @@ func (credentialMgr *DsCredentialMgr) GetAccountConfirmation(ctx context.Context
 	accountKey := datastore.IDKey(credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountConfirmKind"), id, nil)
 	accountKey.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
 
-	var accToken auth.UserAccountConfirmation
+	var accToken UserAccountConfirmation
 
 	err = credentialMgr.CmDsClient.Get(ctx, accountKey, &accToken)
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
-			return nil, auth.ErrConfirmTokenInvalid
+			return nil, ErrConfirmTokenInvalid
 		}
 		return nil, err
 	}
@@ -449,12 +448,12 @@ func (credentialMgr *DsCredentialMgr) GetAccountConfirmation(ctx context.Context
 }
 
 //SaveAccountConfirmation indicates that the user account has returned the confirmtoken after account registration
-func (credentialMgr *DsCredentialMgr) SaveAccountConfirmation(ctx context.Context, userAccountConf *auth.UserAccountConfirmation) (*auth.UserAccountConfirmationResult, error) {
+func (credentialMgr *DsCredentialMgr) SaveAccountConfirmation(ctx context.Context, userAccountConf *UserAccountConfirmation) (*UserAccountConfirmationResult, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "SaveAccountConfirmation", "info", "start")
 	}
 
-	res := &auth.UserAccountConfirmationResult{Result: false}
+	res := &UserAccountConfirmationResult{Result: false}
 
 	id, err := strconv.ParseInt(userAccountConf.ConfirmToken, 10, 64)
 	if err != nil {
@@ -499,7 +498,7 @@ func (credentialMgr *DsCredentialMgr) SaveAccountConfirmation(ctx context.Contex
 }
 
 //SetLoginCandidate writes a login candidate to datastore
-func (credentialMgr *DsCredentialMgr) SetLoginCandidate(ctx context.Context, lc *auth.LoginCandidate) (string, error) {
+func (credentialMgr *DsCredentialMgr) SetLoginCandidate(ctx context.Context, lc *LoginCandidate) (string, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "setLoginCandidate", "info", "start")
 	}
@@ -549,7 +548,7 @@ func (credentialMgr *DsCredentialMgr) SetLoginCandidate(ctx context.Context, lc 
 }
 
 //GetLoginCandidate returns a login candidate record
-func (credentialMgr *DsCredentialMgr) GetLoginCandidate(ctx context.Context, loginID string) (*auth.LoginCandidate, error) {
+func (credentialMgr *DsCredentialMgr) GetLoginCandidate(ctx context.Context, loginID string) (*LoginCandidate, error) {
 	if EnvDebugOn {
 		lblog.LogEvent("DsCredentialMgr", "GetLoginCandidate", "info", "start")
 	}
@@ -562,12 +561,12 @@ func (credentialMgr *DsCredentialMgr) GetLoginCandidate(ctx context.Context, log
 	key := datastore.IDKey(credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsLoginKind"), id, nil)
 	key.Namespace = credentialMgr.Bc.GetConfigValue(ctx, "EnvAuthDsAccountNamespace")
 
-	var lc auth.LoginCandidate
+	var lc LoginCandidate
 
 	err = credentialMgr.CmDsClient.Get(ctx, key, &lc)
 	if err != nil {
 		if err == datastore.ErrNoSuchEntity {
-			return nil, auth.ErrLcNotExist
+			return nil, ErrLcNotExist
 		}
 		return nil, err
 	}

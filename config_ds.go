@@ -1,4 +1,4 @@
-package authds
+package auth
 
 import (
 	"log"
@@ -10,15 +10,8 @@ import (
 	"golang.org/x/net/context"
 )
 
-var (
-	//EnvDebugOn controls verbose logging
-	EnvDebugOn bool
-	//EnvClientPool is the size of the client pool
-	EnvClientPool int
-)
-
-//preflight checks that the incoming configuration map contains the required config elements for the datastore backend
-func preflight(ctx context.Context, bc lbcf.ConfigSetting) {
+//preflightDs checks that the incoming configuration map contains the required config elements for the datastore backend
+func preflightDs(ctx context.Context, bc lbcf.ConfigSetting) {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.LUTC)
 	log.Println("Started AuthDs preflight..")
 
@@ -53,15 +46,6 @@ func preflight(ctx context.Context, bc lbcf.ConfigSetting) {
 		log.Fatal("Could not parse environment variable EnvAuthGcpProject")
 	}
 
-	//set the debug value
-	constlog, err := strconv.ParseBool(bc.GetConfigValue(ctx, "EnvDebugOn"))
-
-	if err != nil {
-		log.Fatal("Could not parse environment variable EnvDebugOn")
-	}
-
-	EnvDebugOn = constlog
-
 	//set the poolsize
 	pl, err := strconv.ParseInt(bc.GetConfigValue(ctx, "EnvClientPool"), 10, 64)
 
@@ -74,8 +58,8 @@ func preflight(ctx context.Context, bc lbcf.ConfigSetting) {
 	log.Println("..Finished AuthDs preflight.")
 }
 
-//preflightConfigLoader loads the session config vars
-func preflightConfigLoader() map[string]string {
+//preflightConfigLoaderDs loads the session config vars
+func preflightConfigLoaderDs() map[string]string {
 	cfm := make(map[string]string)
 
 	/**********************************************************************
