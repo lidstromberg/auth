@@ -104,7 +104,7 @@ func Test_ValidateTwoFactor(t *testing.T) {
 	}
 
 	//replace this code with the number from your authenticator app
-	ulogin2 := &OtpCandidate{LoginID: lgres.LoginID, Otp: "212462"}
+	ulogin2 := &OtpCandidate{LoginID: lgres.LoginID, Otp: "482473"}
 
 	otr := svb.VerifyOtp(ctx, ulogin2)
 	if otr.Check.Error != nil {

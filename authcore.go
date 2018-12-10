@@ -68,10 +68,10 @@ type AuthCore interface {
 
 //Core manages the issue log app operations
 type Core struct {
-	Dm CredentialDataMgr
-	Mc *sendgrid.Client
-	Kp *kp.KeyPair
-	Bc lbcf.ConfigSetting
+	dm CredentialDataMgr
+	mc *sendgrid.Client
+	kp *kp.KeyPair
+	bc lbcf.ConfigSetting
 }
 
 //NewCoreCredentialMgr creates a new credential base manager
@@ -88,10 +88,10 @@ func NewCoreCredentialMgr(ctx context.Context, bc lbcf.ConfigSetting, kpr *kp.Ke
 	}
 
 	ap1 := &Core{
-		Dm: dm,
-		Mc: mc,
-		Kp: kpr,
-		Bc: bc,
+		dm: dm,
+		mc: mc,
+		kp: kpr,
+		bc: bc,
 	}
 
 	if EnvDebugOn {
@@ -151,7 +151,7 @@ func (cr *Core) AccountExists(ctx context.Context, emailAddress string) (bool, e
 		lblog.LogEvent("Core", "AccountExists", "info", "start")
 	}
 
-	count, err := cr.Dm.GetAccountCount(ctx, emailAddress)
+	count, err := cr.dm.GetAccountCount(ctx, emailAddress)
 	if err != nil {
 		return false, err
 	}
@@ -221,7 +221,7 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *UserAccountC
 	useracc.Scopes = append(useracc.Scopes, uaccApp)
 
 	//save the account
-	userid, err := cr.Dm.SaveAccount(ctx, useracc)
+	userid, err := cr.dm.SaveAccount(ctx, useracc)
 	if err != nil {
 		rcr.Check.Error = err
 		rcr.Check.CheckResult = false
@@ -230,7 +230,7 @@ func (cr *Core) Register(ctx context.Context, userAccountCandidate *UserAccountC
 	}
 
 	//start the mail confirmation
-	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid, userAccountCandidate.Email, Registration.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
+	emconf, err := cr.dm.StartAccountConfirmation(ctx, userid, userAccountCandidate.Email, Registration.String(), cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
 	if err != nil {
 		rcr.Check.Error = err
 		rcr.Check.CheckResult = false
@@ -368,7 +368,7 @@ func (cr *Core) GetLoginProfile(ctx context.Context, userID string, withSecure b
 		lblog.LogEvent("Core", "GetLoginProfile", "info", "start")
 	}
 
-	useracc, err := cr.Dm.GetLoginProfile(ctx, userID)
+	useracc, err := cr.dm.GetLoginProfile(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +394,7 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 	otpr := &ToggleOtpResult{Check: chkr}
 
 	//get the profile
-	uacc, err := cr.Dm.GetLoginProfile(ctx, userID)
+	uacc, err := cr.dm.GetLoginProfile(ctx, userID)
 	if err != nil {
 		otpr.Check.CheckResult = false
 		otpr.Check.Error = err
@@ -425,7 +425,7 @@ func (cr *Core) ToggleTwoFactor(ctx context.Context, domain, userID string, peri
 		}
 
 		//turn the secret into an encrypted base64 string
-		twofachash, err := cr.Kp.EncryptBytes(ctx, []byte(rslt.Secret))
+		twofachash, err := cr.kp.EncryptBytes(ctx, []byte(rslt.Secret))
 		if err != nil {
 			otpr.Check.CheckResult = false
 			otpr.Check.Error = err
@@ -487,7 +487,7 @@ func (cr *Core) SaveAccount(ctx context.Context, userAccount *UserAccount) (stri
 		}
 	}
 
-	result, err := cr.Dm.SaveAccount(ctx, userAccount)
+	result, err := cr.dm.SaveAccount(ctx, userAccount)
 	if err != nil {
 		return "", err
 	}
@@ -511,7 +511,7 @@ func (cr *Core) SavePassword(ctx context.Context, userID, newpwd string) (bool, 
 	}
 
 	//get the account
-	userAccount, err := cr.Dm.GetLoginProfile(ctx, userID)
+	userAccount, err := cr.dm.GetLoginProfile(ctx, userID)
 	if err != nil {
 		return false, err
 	}
@@ -520,7 +520,7 @@ func (cr *Core) SavePassword(ctx context.Context, userID, newpwd string) (bool, 
 	userAccount.PasswordHash = pwdHash
 
 	//save the account
-	uaccid, err := cr.Dm.SaveAccount(ctx, userAccount)
+	uaccid, err := cr.dm.SaveAccount(ctx, userAccount)
 	if err != nil {
 		return false, err
 	}
@@ -546,7 +546,7 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 		return "", ErrEmailInvalid
 	}
 
-	userid, err := cr.Dm.GetLoginProfileByEmail(ctx, emailAddress)
+	userid, err := cr.dm.GetLoginProfileByEmail(ctx, emailAddress)
 	if err != nil {
 		return "", err
 	}
@@ -555,7 +555,7 @@ func (cr *Core) RequestReset(ctx context.Context, emailAddress, appName string) 
 		return "", ErrAccountNotExist
 	}
 
-	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userid.UserAccountID, emailAddress, CredentialReset.String(), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
+	emconf, err := cr.dm.StartAccountConfirmation(ctx, userid.UserAccountID, emailAddress, CredentialReset.String(), cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
 	if err != nil {
 		return "", err
 	}
@@ -593,7 +593,7 @@ func (cr *Core) FinishReset(ctx context.Context, userAccountToken, newpwd string
 		lblog.LogEvent("Core", "FinishReset", "info", "start")
 	}
 
-	accconf, err := cr.Dm.GetAccountConfirmation(ctx, userAccountToken)
+	accconf, err := cr.dm.GetAccountConfirmation(ctx, userAccountToken)
 	if err != nil {
 		return nil, err
 	}
@@ -608,7 +608,7 @@ func (cr *Core) FinishReset(ctx context.Context, userAccountToken, newpwd string
 	accconf.ActivatedDate = &currentTime
 
 	//save/verify the token
-	confres, err := cr.Dm.SaveAccountConfirmation(ctx, accconf)
+	confres, err := cr.dm.SaveAccountConfirmation(ctx, accconf)
 	if err != nil {
 		return nil, err
 	}
@@ -647,7 +647,7 @@ func (cr *Core) StartAccountConfirmation(ctx context.Context, userID, email, app
 		return "", ErrEmailInvalid
 	}
 
-	emconf, err := cr.Dm.StartAccountConfirmation(ctx, userID, email, "registration", cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.Bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
+	emconf, err := cr.dm.StartAccountConfirmation(ctx, userID, email, "registration", cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationURL"), cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountConfirmationRdURL"), cr.bc.GetConfigValue(ctx, "EnvAuthMailSenderAccount"), cr.bc.GetConfigValue(ctx, "EnvAuthMailSenderName"))
 	if err != nil {
 		return "", err
 	}
@@ -685,7 +685,7 @@ func (cr *Core) FinishAccountConfirmation(ctx context.Context, userAccountToken 
 		lblog.LogEvent("Core", "FinishAccountConfirmation", "info", "start")
 	}
 
-	accconf, err := cr.Dm.GetAccountConfirmation(ctx, userAccountToken)
+	accconf, err := cr.dm.GetAccountConfirmation(ctx, userAccountToken)
 	if err != nil {
 		return nil, err
 	}
@@ -700,7 +700,7 @@ func (cr *Core) FinishAccountConfirmation(ctx context.Context, userAccountToken 
 	accconf.ActivatedDate = &currentTime
 
 	//save/verify the token
-	confres, err := cr.Dm.SaveAccountConfirmation(ctx, accconf)
+	confres, err := cr.dm.SaveAccountConfirmation(ctx, accconf)
 	if err != nil {
 		return nil, err
 	}
@@ -734,7 +734,7 @@ func (cr *Core) HasAccess(ctx context.Context, emailAddress, appName string) (bo
 	}
 
 	//get the profile
-	uacc1, err := cr.Dm.GetLoginProfileByEmail(ctx, emailAddress)
+	uacc1, err := cr.dm.GetLoginProfileByEmail(ctx, emailAddress)
 	if err != nil {
 		return false, err
 	}
@@ -765,7 +765,7 @@ func (cr *Core) GetAccountRoleToken(ctx context.Context, userID string) (string,
 	}
 
 	//get the profile
-	uacc1, err := cr.Dm.GetLoginProfile(ctx, userID)
+	uacc1, err := cr.dm.GetLoginProfile(ctx, userID)
 	if err != nil {
 		return "", err
 	}
@@ -777,7 +777,7 @@ func (cr *Core) GetAccountRoleToken(ctx context.Context, userID string) (string,
 	for _, item := range accapps {
 		if item.IsActive {
 			userAppRoleKey.WriteString(item.ApplicationName)
-			userAppRoleKey.WriteString(cr.Bc.GetConfigValue(ctx, "EnvAuthAppRoleDelim"))
+			userAppRoleKey.WriteString(cr.bc.GetConfigValue(ctx, "EnvAuthAppRoleDelim"))
 		}
 	}
 
@@ -794,7 +794,7 @@ func (cr *Core) GetAccountRole(ctx context.Context, userID string) ([]*UserAccou
 	}
 
 	//get the profile
-	uacc1, err := cr.Dm.GetLoginProfile(ctx, userID)
+	uacc1, err := cr.dm.GetLoginProfile(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -824,7 +824,7 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *User
 	}
 
 	//see if the account exists..
-	ctd, err := cr.Dm.GetAccountCount(ctx, userAccountCandidate.Email)
+	ctd, err := cr.dm.GetAccountCount(ctx, userAccountCandidate.Email)
 	if err != nil {
 		apr.Check.Error = err
 		apr.Check.CheckResult = false
@@ -841,7 +841,7 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *User
 	}
 
 	//get the credential element of the account
-	candidate, err := cr.Dm.GetAccountCredential(ctx, userAccountCandidate.Email)
+	candidate, err := cr.dm.GetAccountCredential(ctx, userAccountCandidate.Email)
 	if err != nil {
 		apr.Check.Error = err
 		apr.Check.CheckResult = false
@@ -871,7 +871,7 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *User
 		//if the error is that the password was incorrect..
 		if err == utils.ErrCredentialsNotCorrect {
 			//save the failed login attempt
-			lgerr := cr.Dm.SavedFailedLogin(ctx, userAccountCandidate.Email)
+			lgerr := cr.dm.SavedFailedLogin(ctx, userAccountCandidate.Email)
 
 			if lgerr != nil {
 				apr.Check.CheckResult = false
@@ -885,7 +885,7 @@ func (cr *Core) VerifyCredential(ctx context.Context, userAccountCandidate *User
 	//we reach this point if the credential check was successful
 	//if there were previous failed login attempts.. then reset the count.. because all is good now
 	if candidate.AccessFailedCount > 0 {
-		lgerr := cr.Dm.ResetFailedLogin(ctx, userAccountCandidate.Email)
+		lgerr := cr.dm.ResetFailedLogin(ctx, userAccountCandidate.Email)
 
 		if lgerr != nil {
 			apr.Check.CheckResult = false
@@ -927,7 +927,7 @@ func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *OtpCandidate) *OtpR
 		return lor
 	}
 
-	lc, err := cr.Dm.GetLoginCandidate(ctx, otpCandidate.LoginID)
+	lc, err := cr.dm.GetLoginCandidate(ctx, otpCandidate.LoginID)
 	if err != nil {
 		lor.Check.CheckResult = false
 		lor.Check.Error = err
@@ -936,7 +936,7 @@ func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *OtpCandidate) *OtpR
 	}
 
 	//get the credential element of the account
-	candidate, err := cr.Dm.GetAccountCredential(ctx, lc.Email)
+	candidate, err := cr.dm.GetAccountCredential(ctx, lc.Email)
 	if err != nil {
 		lor.Check.Error = err
 		lor.Check.CheckResult = false
@@ -945,7 +945,7 @@ func (cr *Core) VerifyOtp(ctx context.Context, otpCandidate *OtpCandidate) *OtpR
 	}
 
 	//decrypt the secret
-	secret, err := cr.Kp.DecryptString(ctx, candidate.TwoFactorHash)
+	secret, err := cr.kp.DecryptString(ctx, candidate.TwoFactorHash)
 	if err != nil {
 		lor.Check.CheckResult = false
 		lor.Check.Error = err
@@ -980,7 +980,7 @@ func (cr *Core) SaveEmailConfirmation(ctx context.Context, userAccountConf *User
 	currentTime := time.Now()
 
 	if userAccountConf.UserAccountConfirmationType == Registration.String() {
-		uacc, err := cr.Dm.GetLoginProfile(ctx, userAccountConf.UserAccountID)
+		uacc, err := cr.dm.GetLoginProfile(ctx, userAccountConf.UserAccountID)
 		if err != nil {
 			return res, err
 		}
@@ -993,7 +993,7 @@ func (cr *Core) SaveEmailConfirmation(ctx context.Context, userAccountConf *User
 			uacc.EmailConfirmed = true
 			uacc.LastTouched = &currentTime
 
-			uaccid, err := cr.Dm.SaveAccount(ctx, uacc)
+			uaccid, err := cr.dm.SaveAccount(ctx, uacc)
 			if err != nil {
 				return res, err
 			}
@@ -1037,15 +1037,15 @@ func (cr *Core) SendMail(ctx context.Context, emailConfirm *UserEmailConfirm, ap
 	switch emailConfirm.UserAccountConfirmationType {
 	case Registration.String():
 		{
-			subject = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegSubject"), appName)
-			plainTextContent = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegPlainTxt"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
-			htmlContent = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegHTML"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
+			subject = fmt.Sprintf(cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountRegSubject"), appName)
+			plainTextContent = fmt.Sprintf(cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountRegPlainTxt"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
+			htmlContent = fmt.Sprintf(cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountRegHTML"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
 		}
 	case CredentialReset.String():
 		{
-			subject = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegSubject"), appName)
-			plainTextContent = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegPlainTxt"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
-			htmlContent = fmt.Sprintf(cr.Bc.GetConfigValue(ctx, "EnvAuthMailAccountRegHTML"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
+			subject = fmt.Sprintf(cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountRegSubject"), appName)
+			plainTextContent = fmt.Sprintf(cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountRegPlainTxt"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
+			htmlContent = fmt.Sprintf(cr.bc.GetConfigValue(ctx, "EnvAuthMailAccountRegHTML"), emailConfirm.ConfirmURL, emailConfirm.ConfirmToken)
 		}
 	default:
 		return false, ErrMailConfirmNotCompleted
@@ -1054,7 +1054,7 @@ func (cr *Core) SendMail(ctx context.Context, emailConfirm *UserEmailConfirm, ap
 	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
 
 	if liveCall {
-		response, err := cr.Mc.Send(message)
+		response, err := cr.mc.Send(message)
 		if err != nil {
 			return false, err
 		}
@@ -1093,7 +1093,7 @@ func (cr *Core) SaveLoginCandidate(ctx context.Context, userID, email, roletoken
 		ActivatedDate: activatedTime,
 	}
 
-	logid, err := cr.Dm.SetLoginCandidate(ctx, lc)
+	logid, err := cr.dm.SetLoginCandidate(ctx, lc)
 	if err != nil {
 		return "", err
 	}
@@ -1110,7 +1110,7 @@ func (cr *Core) ActivateLoginCandidate(ctx context.Context, loginID string) (map
 
 	currentTime := time.Now()
 
-	lc, err := cr.Dm.GetLoginCandidate(ctx, loginID)
+	lc, err := cr.dm.GetLoginCandidate(ctx, loginID)
 	if err != nil {
 		return nil, err
 	}
@@ -1132,7 +1132,7 @@ func (cr *Core) ActivateLoginCandidate(ctx context.Context, loginID string) (map
 	lc.ActivatedDate = &currentTime
 
 	//and save back
-	_, err = cr.Dm.SetLoginCandidate(ctx, lc)
+	_, err = cr.dm.SetLoginCandidate(ctx, lc)
 	if err != nil {
 		return nil, err
 	}

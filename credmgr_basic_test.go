@@ -43,7 +43,7 @@ func Test_DataRepoConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := cm.CmDsClient.NewTransaction(ctx)
+	tx, err := cm.dsclient.NewTransaction(ctx)
 
 	if err != nil {
 		t.Fatal(err)
