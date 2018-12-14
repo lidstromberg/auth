@@ -1,6 +1,6 @@
-# Auth - Go user account management for Google Cloud Datastore/Google Cloud SQL Postgres
+# Auth - Go user account management for Google Cloud Datastore
 
-A Go bundle for user account management, authentication & authorisation, utilising Google Cloud Platform Datastore or PostgresSQL.
+A Go bundle for user account management, authentication & authorisation, utilising Google Cloud Platform Datastore.
 
 ## What?
 This is Go code which bundles some common authentication and authorisation workflows:
@@ -12,7 +12,7 @@ This is Go code which bundles some common authentication and authorisation workf
 * Confirmation email workflows (via [Sendgrid])
 
 ## Why?
-I switched from using dotnet core which has identity core built-in, to using Go (for various reasons). I couldn't find an equivalent user management package for Go, and I didn't want to buy a service because I didn't have a revenue stream to pay with. I work mainly with Google Cloud Platform, so I wanted something which would use a GCP backend. So this started as a learning exercise to see if I could create something which would work using either GCP Datastore or Cloud SQL (Postgres).
+I switched from using dotnet core which has identity core built-in, to using Go (for various reasons). I couldn't find an equivalent user management package for Go, and I didn't want to buy a service because I didn't have a revenue stream to pay with. I work mainly with Google Cloud Platform, so I wanted something which would use a GCP backend. So this started as a learning exercise to see if I could create something which would work using either GCP Datastore.
 
 ## How?
 There are three ways to use the package:
@@ -28,7 +28,6 @@ See [examples] for grpc and http/appengine implementations which use auth.
 This utilises the following fine pieces of work:
 * [Dave Grijalva]'s [jwt-go] Go implementation of JSON Web Tokens (JWT)
 * [Paul Querna]'s [otp] Go implementation for one time passwords (2FA)
-* [Pq] Pure Go Postgres driver for database/sql
 * [Segment]'s [ksuid] - K-Sortable Globally Unique IDs
 * [Sendgrid]'s [sendgrid-go] - Official SendGrid Led, Community Driven Golang API Library
 * [GCP]'s [Datastore Go client] and [Storage Go client]
@@ -41,9 +40,7 @@ $ go get -u github.com/lidstromberg/auth
 ```
 #### Environment Variables
 You will also need to export (linux/macOS) or create (Windows) some environment variables.
-The mandatory environment variables must be set, with the following possible exception: the Cloud SQL vars are only required if you want to use a postgres backend. Ignore the Cloud SQL vars if you want to use a GCP Datastore backend.
-
-The static environment variables can be changed but don't need to be.
+The mandatory environment variables must be set. The static environment variables can be changed but don't need to be.
 
 ```sh
 ################START OF MANDATORY ENV VARS################
@@ -68,15 +65,6 @@ export GOOGLE_APPLICATION_CREDENTIALS="/PATH/TO/GCPCREDENTIALS.JSON"
 export SENDGRID_API_KEY="{{SENDGRID_API_KEY}}"
 ```
 (See [Sendgrid Trial])
-```sh
-################################
-# CLOUD SQL
-################################
-export LBAUTH_SQLDST="cloudsqlpostgres"
-export LBAUTH_SQLCNX="host=127.0.0.1:5432 dbname={{DBNAME}} user={{USER}} password={{PASSWORD}} sslmode=disable"
-```
-(See [Cloud SQL Postgres])
-
 ```sh
 ################################
 # AUTH DEBUG FLAG
@@ -146,14 +134,13 @@ If you intend to use GCP datastore as your backend, then you will require:
 * A GCP project
 * A GCP storage bucket (private) to store the jwt private/public keys and the mailerdata.json file (in the root of the bucket)
 * GCP Datastore enabled (which currently means your GCP Project's AppEngine must be enabled)
-* Your GOOGLE_APPLICATION_CREDENTIALS json credentials key should be created with the following IAM scopes: 'Cloud SQL Client' (If you want to the use Cloud SQL Postgres); 'Cloud Datastore User'; 'Storage Object Viewer' and 'Storage Object Creator', or 'Storage Object Admin'.
+* Your GOOGLE_APPLICATION_CREDENTIALS json credentials key should be created with the following IAM scopes: 'Cloud Datastore User'; 'Storage Object Viewer' and 'Storage Object Creator', or 'Storage Object Admin'.
 
 
    [Dave Grijalva]: <https://github.com/dgrijalva>
    [jwt-go]: <https://github.com/dgrijalva/jwt-go>
    [Paul Querna]: <https://github.com/pquerna>
    [otp]: <https://github.com/pquerna/otp>
-   [Pq]: <https://github.com/lib/pq>
    [Segment]: <https://github.com/segmentio>
    [ksuid]: <https://github.com/segmentio/ksuid>
    [GCP]: <https://cloud.google.com/>
@@ -163,5 +150,4 @@ If you intend to use GCP datastore as your backend, then you will require:
    [sendgrid-go]: <https://github.com/sendgrid/sendgrid-go>
    [Sendgrid Trial]: <https://signup.sendgrid.com>
    [Google Application Credentials]: <https://cloud.google.com/docs/authentication/production#auth-cloud-implicit-go>
-   [Cloud SQL Postgres]: <https://cloud.google.com/sql/docs/postgres/sql-proxy>
    [examples]: <https://github.com/lidstromberg/examples>
