@@ -20,7 +20,7 @@ func Test_DataRepoConnect(t *testing.T) {
 	bc.LoadConfigMap(ctx, cfm1)
 
 	//create a storage manager
-	sm, err := stor.NewStorMgr(ctx, bc)
+	sm, err := stor.NewMgr(ctx, bc)
 
 	if err != nil {
 		log.Fatal(err)
